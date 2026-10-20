@@ -115,8 +115,12 @@ def _reset_state(pop):
 
 
 def run_single(G, destinations, base_pop, cfg, scenario_cfg, policy_name,
-               fleet_size, seeds: dict) -> dict:
-    """Run one evacuation. seeds: {behavior, dispatch, hazard} ints."""
+               fleet_size, seeds: dict, record_every_s=None, max_render=4000,
+               return_sim=False) -> dict:
+    """Run one evacuation. seeds: {behavior, dispatch, hazard} ints.
+
+    If record_every_s is set, the Simulation records replay frames; pass
+    return_sim=True to get (result, sim) so callers can read sim.frames."""
     pop = copy.deepcopy(base_pop)
     _reset_state(pop)
     net = MesoNetwork(G, destinations)
@@ -147,7 +151,8 @@ def run_single(G, destinations, base_pop, cfg, scenario_cfg, policy_name,
             n_vehicles=fleet_size, seats_per_av=cfg["fleet"]["fleet"]["seats_per_av"],
             service_centroid=centroid, max_av_wait_s=max_wait)
 
-    sim = Simulation_factory(pop, net, gt, dispatcher, cfg, scenario_cfg)
+    sim = Simulation_factory(pop, net, gt, dispatcher, cfg, scenario_cfg,
+                             record_every_s=record_every_s, max_render=max_render)
     result = sim.run()
     result["meta"] = {
         "policy": policy_name if fleet_size > 0 else "none(no_av)",
@@ -156,11 +161,15 @@ def run_single(G, destinations, base_pop, cfg, scenario_cfg, policy_name,
         "behavior_summary": behav_summary,
         "population_source": base_pop.meta.get("SOURCE", "unknown"),
     }
+    if return_sim:
+        return result, sim
     return result
 
 
-def Simulation_factory(pop, net, gt, dispatcher, cfg, scenario_cfg):
+def Simulation_factory(pop, net, gt, dispatcher, cfg, scenario_cfg,
+                       record_every_s=None, max_render=4000):
     # imported here to avoid a circular import at module load
     from .engine import Simulation
     on_closure = cfg["hazard"].get("on_closure", {}) if "hazard" in cfg else {}
-    return Simulation(pop, net, gt, dispatcher, cfg["sim"], on_closure, scenario_cfg)
+    return Simulation(pop, net, gt, dispatcher, cfg["sim"], on_closure, scenario_cfg,
+                      record_every_s=record_every_s, max_render_vehicles=max_render)

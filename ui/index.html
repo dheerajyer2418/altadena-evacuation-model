@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Altadena Evacuation — Mission Control</title>
+<script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#121823; --panel2:#0e141d; --edge:#1e2a3a;
+    --accent:#46e0c0; --accent2:#ffd24a; --fire:#ff5a3c; --carless:#ff5277;
+    --text:#d8e2ee; --muted:#7d8ea3; --good:#46e07a; --blue:#4aa3ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:"Segoe UI",Inter,system-ui,sans-serif;overflow:hidden}
+  #app{display:grid;height:100vh;
+    grid-template-columns:270px 1fr 300px;
+    grid-template-rows:54px 1fr 92px;
+    grid-template-areas:"hdr hdr hdr" "left center right" "left foot right";gap:8px;padding:8px}
+  .panel{background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--edge);border-radius:10px;box-shadow:0 2px 14px #0008}
+  #hdr{grid-area:hdr;display:flex;align-items:center;gap:14px;padding:0 16px}
+  #hdr h1{font-size:16px;margin:0;letter-spacing:.5px;font-weight:600}
+  #hdr .tag{font-size:11px;color:var(--muted);border:1px solid var(--edge);
+    padding:2px 8px;border-radius:20px}
+  #hdr .live{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  #clock{font-variant-numeric:tabular-nums;color:var(--accent);font-size:15px;font-weight:600}
+  #left{grid-area:left;padding:12px;overflow:auto}
+  #right{grid-area:right;padding:12px;overflow:auto}
+  #center{grid-area:center;position:relative;overflow:hidden;padding:0}
+  #deck{position:absolute;inset:0;border-radius:10px}
+  #foot{grid-area:foot;padding:10px 16px;display:flex;flex-direction:column;gap:8px}
+  h2.sec{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);
+    margin:4px 0 8px;border-bottom:1px solid var(--edge);padding-bottom:5px}
+  button{font-family:inherit;color:var(--text);background:#17202e;border:1px solid var(--edge);
+    border-radius:7px;padding:8px 10px;cursor:pointer;font-size:13px;transition:.12s;width:100%}
+  button:hover{border-color:var(--accent);background:#1b2636}
+  button.active{border-color:var(--accent);background:#163b36;color:#fff}
+  .scen-btn{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;text-align:left}
+  .scen-btn small{color:var(--muted);font-size:11px}
+  .ctl{display:flex;align-items:center;gap:8px;margin:8px 0}
+  .ctl label{font-size:12px;color:var(--muted);width:54px}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .transport{display:flex;gap:6px}
+  .transport button{font-size:16px;padding:6px}
+  .stat{display:flex;justify-content:space-between;align-items:baseline;margin:7px 0}
+  .stat .k{font-size:12px;color:var(--muted)}
+  .stat .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+  .big{font-size:30px}
+  .bar{height:8px;background:#1b2636;border-radius:5px;overflow:hidden;margin-top:3px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--good),var(--accent))}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  #tl{display:flex;align-items:center;gap:10px}
+  #tl input{flex:1}
+  .note{font-size:10px;color:var(--muted);line-height:1.4}
+  #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:14px;background:#0a0e14cc;z-index:5}
+  .pill{font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid var(--edge);color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hdr" class="panel">
+    <h1>ALTADENA EVACUATION</h1>
+    <span class="tag" id="src-tag">loading…</span>
+    <span class="tag" id="mode-tag"></span>
+    <div class="live"><span id="play-state">● PAUSED</span>
+      <span>T+</span><span id="clock">00:00</span></div>
+  </div>
+
+  <div id="left" class="panel">
+    <h2 class="sec">Scenario</h2>
+    <div id="scenarios"><div class="note">No replays found. Generate one:<br>
+      <code>python -m scripts.export_replay --mode altadena --fleet 0</code></div></div>
+
+    <h2 class="sec" style="margin-top:16px">Playback</h2>
+    <div class="transport">
+      <button id="btn-restart" title="Restart">⟲</button>
+      <button id="btn-play" title="Play/Pause">▶</button>
+      <button id="btn-end" title="Jump to end">⇥</button>
+    </div>
+    <div class="ctl"><label>Speed</label>
+      <input id="speed" type="range" min="1" max="120" value="40"/>
+      <span id="speed-v" class="pill">40×</span></div>
+
+    <h2 class="sec" style="margin-top:16px">Layers</h2>
+    <div class="ctl"><label>Roads</label><input id="ly-roads" type="checkbox" checked></div>
+    <div class="ctl"><label>Homes</label><input id="ly-origins" type="checkbox" checked></div>
+    <div class="ctl"><label>Fire</label><input id="ly-fire" type="checkbox" checked></div>
+    <div class="ctl"><label>Vehicles</label><input id="ly-veh" type="checkbox" checked></div>
+    <div class="ctl"><label>Spin</label><input id="ly-spin" type="checkbox"></div>
+  </div>
+
+  <div id="center" class="panel">
+    <div id="deck"></div>
+    <div id="loading">initializing 3-D map…</div>
+  </div>
+
+  <div id="right" class="panel">
+    <h2 class="sec">Live outcomes</h2>
+    <div class="stat"><span class="k">Reached safety</span><span class="v big" id="s-reached" style="color:var(--good)">—</span></div>
+    <div class="bar"><i id="s-reached-bar" style="width:0%"></i></div>
+    <div class="stat"><span class="k">Still in transit / waiting</span><span class="v" id="s-transit">—</span></div>
+    <div class="stat"><span class="k">Exposed to fire</span><span class="v" id="s-exposed" style="color:var(--fire)">—</span></div>
+    <div class="stat"><span class="k">Trapped vehicles</span><span class="v" id="s-trapped">—</span></div>
+
+    <h2 class="sec" style="margin-top:16px">Carless households <span class="pill">focus</span></h2>
+    <div class="stat"><span class="k">Carless reached</span><span class="v big" id="s-carless" style="color:var(--carless)">—</span></div>
+    <div class="bar"><i id="s-carless-bar" style="width:0%;background:linear-gradient(90deg,#ff5277,#ffd24a)"></i></div>
+    <div class="stat"><span class="k">Carless present</span><span class="v" id="s-carless-n">—</span></div>
+    <div class="stat"><span class="k">AVs in service</span><span class="v" id="s-av">—</span></div>
+
+    <h2 class="sec" style="margin-top:16px">Network</h2>
+    <div class="stat"><span class="k">Roads closed by fire</span><span class="v" id="s-closed">—</span></div>
+  </div>
+
+  <div id="foot" class="panel">
+    <div id="tl">
+      <span class="pill" id="tl-t">T+00:00</span>
+      <input id="scrub" type="range" min="0" max="100" value="0"/>
+      <span class="pill" id="tl-end">—</span>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:#4aa3ff"></i>private vehicle</span>
+      <span><i class="dot" style="background:#ffd24a"></i>AV (empty)</span>
+      <span><i class="dot" style="background:#46e07a"></i>AV (carrying)</span>
+      <span><i class="dot" style="background:#ff5277"></i>carless home</span>
+      <span><i class="dot" style="background:#ff5a3c"></i>fire front</span>
+      <span><i class="dot" style="background:#46e0c0"></i>safety exit</span>
+      <span class="note" id="foot-note"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmtT = s => { s=Math.max(0,Math.round(s)); const m=Math.floor(s/60),ss=s%60;
+  return String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0'); };
+
+let deckgl=null, replay=null, frames=[], playing=false, speed=40, t=0, horizon=0;
+let layersState={roads:true,origins:true,fire:true,veh:true,spin:false};
+let lastRAF=null, vs=null;
+
+async function loadIndex(){
+  try{
+    const idx = await (await fetch('../outputs/ui/index.json?_='+Date.now())).json();
+    const box = $('#scenarios'); box.innerHTML='';
+    const items = Object.values(idx);
+    if(!items.length){ box.innerHTML='<div class="note">No replays yet. Run <code>export_replay</code>.</div>'; return; }
+    items.forEach((it,i)=>{
+      const b=document.createElement('button'); b.className='scen-btn';
+      const rf=it.reached_frac!=null?Math.round(it.reached_frac*100)+'%':'—';
+      const cf=it.carless_reached_frac!=null?Math.round(it.carless_reached_frac*100)+'%':'—';
+      b.innerHTML=`<span>${it.label}</span><small>reached ${rf} · carless ${cf}</small>`;
+      b.onclick=()=>{document.querySelectorAll('.scen-btn').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active'); loadReplay(it.file);};
+      box.appendChild(b);
+      if(i===0){ b.classList.add('active'); loadReplay(it.file); }
+    });
+  }catch(e){ console.error(e);
+    $('#scenarios').innerHTML='<div class="note">Could not read index.json.<br>Start the server: <code>python -m scripts.serve_ui</code></div>'; }
+}
+
+async function loadReplay(file){
+  $('#loading').style.display='flex'; $('#loading').textContent='loading '+file+' …';
+  try{
+    replay = await (await fetch('../outputs/ui/'+file+'?_='+Date.now())).json();
+    frames = replay.frames||[];
+    horizon = replay.meta?.horizon_s || (frames.length?frames[frames.length-1].t:0);
+    $('#scrub').max = horizon; $('#tl-end').textContent='T+'+fmtT(horizon);
+    $('#src-tag').textContent = replay.meta?.note?.slice(0,42) || '';
+    $('#mode-tag').textContent = (replay.meta?.mode||'')+' · '+(replay.meta?.policy||'');
+    $('#foot-note').textContent = replay.meta?.note || '';
+    t=0; initDeck(); setTime(0); play(false); startLoop();
+    $('#loading').style.display='none';
+  }catch(e){ console.error(e); $('#loading').textContent='failed to load '+file; }
+}
+
+function initViewState(){
+  const b=replay.bounds;
+  return {longitude:b.clon, latitude:b.clat, zoom:12.4, pitch:52, bearing:0};
+}
+
+// anisotropic fire front polygon at time tt (same formula as the Python hazard)
+function firePolygon(tt){
+  const h=replay.hazard; if(!h||h.model!=='radial_front') return [];
+  const dt=tt-(h.detection_s||0); if(dt<=0) return [];
+  const bias=h.dir_bias_deg*Math.PI/180, aniso=h.anisotropy||1, base=h.speed_mps;
+  const ring=[]; const coslat=Math.cos(h.ig_lat*Math.PI/180);
+  for(let i=0;i<=72;i++){
+    const brg=i/72*2*Math.PI;               // 0=north, clockwise
+    const align=Math.cos(brg-bias);
+    const factor=1+(aniso-1)*(align+1)/2;
+    const r=base*Math.max(factor,0.15)*dt;   // meters
+    const north=r*Math.cos(brg), east=r*Math.sin(brg);
+    const lon=h.ig_lon + (east/6371000)*180/Math.PI/coslat;
+    const lat=h.ig_lat + (north/6371000)*180/Math.PI;
+    ring.push([lon,lat]);
+  }
+  return [ring];
+}
+
+function nearestFrame(tt){
+  if(!frames.length) return null;
+  let lo=0,hi=frames.length-1,ans=0;
+  while(lo<=hi){const m=(lo+hi)>>1; if(frames[m].t<=tt){ans=m;lo=m+1;}else hi=m-1;}
+  return frames[ans];
+}
+
+const KIND_COLOR={1:[74,163,255],2:[255,210,74],3:[70,224,122]};
+function buildLayers(){
+  const L=[]; const fr=nearestFrame(t);
+  if(layersState.roads && replay.roads)
+    L.push(new deck.PathLayer({id:'roads',data:replay.roads,getPath:d=>d,
+      getColor:[70,90,120,120],getWidth:2,widthUnits:'pixels'}));
+  if(layersState.origins && replay.origins)
+    L.push(new deck.ScatterplotLayer({id:'homes',data:replay.origins,
+      getPosition:d=>[d[0],d[1]],getFillColor:d=>d[2]?[255,82,119,180]:[90,110,140,90],
+      getRadius:d=>d[2]?18:10,radiusUnits:'meters',radiusMinPixels:1.5,radiusMaxPixels:4}));
+  if(layersState.fire && replay.hazard){
+    const poly=firePolygon(t);
+    if(poly.length) L.push(new deck.PolygonLayer({id:'fire',data:poly,
+      getPolygon:d=>d,getFillColor:[255,90,60,55],getLineColor:[255,90,60,200],
+      getLineWidth:3,lineWidthUnits:'pixels',extruded:true,getElevation:120,stroked:true,filled:true}));
+  }
+  if(replay.destinations)
+    L.push(new deck.ScatterplotLayer({id:'dest',data:replay.destinations,
+      getPosition:d=>[d[0],d[1]],getFillColor:[70,224,192,230],getLineColor:[255,255,255,220],
+      stroked:true,getLineWidth:2,lineWidthUnits:'pixels',
+      getRadius:80,radiusUnits:'meters',radiusMinPixels:7,radiusMaxPixels:16}));
+  if(layersState.veh && fr)
+    L.push(new deck.ScatterplotLayer({id:'veh',data:fr.pts,
+      getPosition:d=>[d[0],d[1]],getFillColor:d=>KIND_COLOR[d[2]]||[200,200,200],
+      getRadius:d=>d[2]>=2?26:16,radiusUnits:'meters',radiusMinPixels:2,radiusMaxPixels:6,
+      stroked:false,updateTriggers:{getPosition:t,getFillColor:t}}));
+  return L;
+}
+
+function initDeck(){
+  vs=initViewState();
+  const layers=buildLayers();
+  if(deckgl){ deckgl.setProps({viewState:vs,layers}); return; }
+  deckgl=new deck.DeckGL({container:'deck',viewState:vs,controller:true,
+    views:[new deck.MapView({repeat:false})],
+    onViewStateChange:({viewState})=>{vs=viewState; deckgl.setProps({viewState:vs});},
+    parameters:{clearColor:[0.04,0.055,0.08,1]},layers});
+}
+
+function setTime(tt){
+  t=Math.max(0,Math.min(horizon,tt));
+  $('#clock').textContent=fmtT(t); $('#tl-t').textContent='T+'+fmtT(t);
+  $('#scrub').value=t;
+  const fr=nearestFrame(t);
+  if(fr){ const s=fr.stats;
+    const pct=s.present?Math.round(100*s.reached/s.present):0;
+    $('#s-reached').textContent=s.reached.toLocaleString()+' ('+pct+'%)';
+    $('#s-reached-bar').style.width=pct+'%';
+    $('#s-transit').textContent=(s.present-s.reached-0).toLocaleString();
+    $('#s-exposed').textContent=s.exposed.toLocaleString();
+    $('#s-trapped').textContent=s.trapped_vehicles.toLocaleString();
+    const cp=s.carless_present||0, cpct=cp?Math.round(100*s.carless_reached/cp):0;
+    $('#s-carless').textContent=s.carless_reached.toLocaleString()+' ('+cpct+'%)';
+    $('#s-carless-bar').style.width=cpct+'%';
+    $('#s-carless-n').textContent=cp.toLocaleString();
+    $('#s-av').textContent=(s.av_active||0).toLocaleString();
+    $('#s-closed').textContent=(s.closed_links||0).toLocaleString();
+  }
+  if(deckgl) deckgl.setProps({layers:buildLayers()});
+}
+
+function play(on){ playing=on; $('#btn-play').textContent=on?'❚❚':'▶';
+  $('#play-state').textContent=on?'● LIVE':'● PAUSED';
+  $('#play-state').style.color=on?'var(--good)':'var(--muted)'; }
+
+let loopStarted=false;
+function startLoop(){ if(loopStarted) return; loopStarted=true;
+  lastRAF=performance.now(); requestAnimationFrame(loop); }
+function loop(now){
+  const dt=Math.min(0.1,(now-lastRAF)/1000); lastRAF=now;
+  if(layersState.spin && vs){ vs={...vs,bearing:(vs.bearing+dt*6)%360}; deckgl.setProps({viewState:vs}); }
+  if(playing){
+    let nt=t+dt*speed;
+    if(nt>=horizon){ setTime(horizon); play(false); } else setTime(nt);
+  }
+  requestAnimationFrame(loop);
+}
+
+// wire controls
+$('#btn-play').onclick=()=>play(!playing);
+$('#btn-restart').onclick=()=>{setTime(0);play(true);};
+$('#btn-end').onclick=()=>{play(false);setTime(horizon);};
+$('#speed').oninput=e=>{speed=+e.target.value;$('#speed-v').textContent=speed+'×';};
+$('#scrub').oninput=e=>{play(false);setTime(+e.target.value);};
+['roads','origins','fire','veh','spin'].forEach(k=>{
+  $('#ly-'+k).onchange=e=>{layersState[k]=e.target.checked;
+    if(k==='spin'&&!e.target.checked){} setTime(t);};
+});
+loadIndex();
+</script>
+</body>
+</html>

@@ -86,6 +86,30 @@ python -m scripts.compare_policies --config config/experiments.yaml
 python -m pytest -q
 ```
 
+### Live UI ("mission control")
+
+A browser-based, video-game-style dashboard: a 3-D pitched map of Altadena in the
+center (real roads, household homes, safety exits, an expanding fire front, and
+vehicles moving over time) framed by control panels — play/pause, speed, timeline
+scrubber, scenario buttons, and live counters (reached / exposed / carless
+stranded / trapped / clearance %).
+
+```powershell
+# 1. Generate one or more replays (each run becomes a scenario button).
+python -m scripts.export_replay --mode altadena --fleet 0   --label "No-AV baseline"
+python -m scripts.export_replay --mode altadena --fleet 300 --policy adaptive_geofencing --label "Geofencing 300 AVs"
+#    (with CENSUS_API_KEY set, these use the REAL population; else synthetic.)
+
+# 2. Launch the UI (serves the project so the browser can read the replays).
+python -m scripts.serve_ui          # opens http://localhost:8000/ui/index.html
+```
+
+The UI plays back a **recorded** simulation smoothly (frame-by-frame), which is
+the practical meaning of "watch it live". It needs internet once to load deck.gl
+from a CDN. Replays live in `outputs/ui/` (gitignored — regenerate with
+`export_replay`). The rendered vehicles are a capped sample for performance; the
+counters are full-population.
+
 Outputs (CSV/JSON, plots, maps) land in `outputs/<experiment>/`.
 
 ---
