@@ -146,7 +146,9 @@ let lastRAF=null, vs=null;
 
 async function loadIndex(){
   try{
-    const idx = await (await fetch('../outputs/ui/index.json?_='+Date.now())).json();
+    // Standalone mode: data embedded by export_standalone.py (works via file://).
+    const idx = window.__INDEX__ ||
+      await (await fetch('../outputs/ui/index.json?_='+Date.now())).json();
     const box = $('#scenarios'); box.innerHTML='';
     const items = Object.values(idx);
     if(!items.length){ box.innerHTML='<div class="note">No replays yet. Run <code>export_replay</code>.</div>'; return; }
@@ -167,7 +169,8 @@ async function loadIndex(){
 async function loadReplay(file){
   $('#loading').style.display='flex'; $('#loading').textContent='loading '+file+' …';
   try{
-    replay = await (await fetch('../outputs/ui/'+file+'?_='+Date.now())).json();
+    replay = (window.__REPLAYS__ && window.__REPLAYS__[file]) ||
+      await (await fetch('../outputs/ui/'+file+'?_='+Date.now())).json();
     frames = replay.frames||[];
     horizon = replay.meta?.horizon_s || (frames.length?frames[frames.length-1].t:0);
     $('#scrub').max = horizon; $('#tl-end').textContent='T+'+fmtT(horizon);

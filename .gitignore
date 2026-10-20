@@ -16,6 +16,9 @@ secrets.*
 # osmnx HTTP cache
 cache/
 
+# generated standalone UI bundle (large; regenerate with export_standalone)
+altadena_live.html
+
 # Python
 __pycache__/
 *.pyc
