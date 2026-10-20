@@ -76,6 +76,28 @@ All quantitative results produced here are either:
 They are useful for **relative** comparison of AV policies under identical inputs
 (the research question), **not** as absolute predictions for Altadena.
 
+## Real end-to-end baseline (REAL population + REAL network)
+
+No-AV baseline with the real ACS/PUMS population on the real Altadena OSM network,
+hypothetical foothill fire, one seed:
+
+| metric | value |
+|---|---|
+| present persons | 39,606 |
+| reached safety | 15,267 (**38.5%**) |
+| not reached | 24,339 |
+| exposed | 24,014 |
+| trapped vehicles | 2,048 |
+| carless persons reached | **0 / 1,100 (0%)** |
+| top-link saturation | **1.0 (jammed)** |
+| full clearance | No (clearance time withheld) |
+
+This exercises **full-population demand with real congestion** (not 200 agents,
+not fixed travel times). The low reach rate is congestion-dominated (saturation
+1.0, 2,048 trapped), establishing the no-AV / carless-stranded baseline the AV
+policy experiments improve on. It is a HYPOTHETICAL scenario on an UNCALIBRATED
+traffic model — relative comparison only, not an Altadena prediction.
+
 ## Illustrative relative finding (synthetic population, real network)
 
 On the real Altadena network with 551 synthetic households and the default
