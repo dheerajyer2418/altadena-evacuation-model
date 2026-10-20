@@ -65,14 +65,20 @@ def build_census_population(cfg: dict, api_key: str | None = None, seed: int = 1
 
 
 def place_real(pop, net, bg_gdf, study_cfg, rng):
-    """Place households from OSM residential buildings inside block-group polygons;
-    fall back to network-node placement (labeled) if OSM buildings are unavailable."""
+    """Place households inside their block-group polygons.
+
+    Best: snap to OSM residential building centroids within each block group.
+    If OSM buildings are unavailable (e.g. Overpass timeout), fall back to a
+    uniform random point inside the household's TIGER block-group polygon (still
+    geographically correct, labeled 'landuse_random') — this needs no Overpass.
+    Only if the polygons themselves are missing do we drop to network-node
+    placement. Every fallback is labeled on the household."""
+    res = None
     try:
         import osmnx as ox
         place_geom = bg_gdf.geometry.union_all() if hasattr(bg_gdf.geometry, "union_all") \
             else bg_gdf.geometry.unary_union
         feats = ox.features_from_polygon(place_geom, tags={"building": True})
-        # residential-ish buildings only
         if "building" in feats.columns:
             res = feats[feats["building"].isin(
                 ["residential", "house", "detached", "apartments", "yes",
@@ -80,8 +86,12 @@ def place_real(pop, net, bg_gdf, study_cfg, rng):
         else:
             res = feats
         res = res[res.geometry.type.isin(["Polygon", "MultiPolygon"])]
-        return place_from_osm(pop, net, bg_gdf, res,
-                              study_cfg["crs"]["projected"], rng)
-    except Exception as e:  # noqa: BLE001 — any OSM/geo failure -> labeled fallback
+    except Exception as e:  # noqa: BLE001 — OSM buildings unavailable
+        pop.meta["placement_osm_buildings_unavailable"] = f"{type(e).__name__}: {e}"
+        res = None  # place_from_osm then samples within each block-group polygon
+
+    try:
+        return place_from_osm(pop, net, bg_gdf, res, study_cfg["crs"]["projected"], rng)
+    except Exception as e:  # noqa: BLE001 — polygons missing -> last-resort
         pop.meta["placement_fallback_reason"] = f"{type(e).__name__}: {e}"
         return place_on_network(pop, net, rng, method_label="network_node_fallback")

@@ -76,14 +76,26 @@ def prepare(cfg, mode: str, seed: int):
     rng = np.random.default_rng(seed)
 
     if mode == "altadena" and os.environ.get("CENSUS_API_KEY"):
+        base_pop = bg_gdf = None
         try:
-            from ..population.build_real import build_census_population, place_real
+            from ..population.build_real import build_census_population
             base_pop, bg_gdf = build_census_population(cfg, seed=seed)
-            place_real(base_pop, net, bg_gdf, cfg["study"], rng)
-            return G, dests, base_pop
-        except Exception as e:  # noqa: BLE001
-            print(f"  [real population path failed: {type(e).__name__}: {e}]")
+            print(f"  real population: {base_pop.n_households} hh / "
+                  f"{base_pop.n_persons} persons (SRMSE {base_pop.meta.get('mean_srmse')})")
+        except Exception as e:  # noqa: BLE001 — synthesis failure -> synthetic fallback
+            print(f"  [real population synthesis failed: {type(e).__name__}: {e}]")
             print("  falling back to SYNTHETIC population.")
+        if base_pop is not None:
+            # Placement failure must NOT discard the real population: fall back to
+            # network-node placement (labeled) while keeping the real households.
+            try:
+                from ..population.build_real import place_real
+                place_real(base_pop, net, bg_gdf, cfg["study"], rng)
+            except Exception as e:  # noqa: BLE001
+                print(f"  [OSM-building placement failed: {type(e).__name__}: {e}; "
+                      f"using network-node placement]")
+                place_on_network(base_pop, net, rng)
+            return G, dests, base_pop
 
     base_pop = build_offline_population(cfg, seed=seed)
     place_on_network(base_pop, net, rng)
