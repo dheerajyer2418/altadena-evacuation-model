@@ -1,0 +1,63 @@
+# ============================================================================
+# AV FLEET & DISPATCH POLICIES
+# ============================================================================
+# Fleet size is an EXPLICIT NUMBER OF VEHICLES (requirement 3). A ratio, if used,
+# names its denominator. We do NOT call vehicles-per-resident "market penetration".
+
+fleet:
+  size_mode: absolute           # absolute | ratio
+  n_vehicles: 200               # number of AVs (overridden per-experiment)
+  ratio:                        # used only if size_mode: ratio
+    value: 0.01
+    denominator: carless_households   # AVs per carless household (NOT per resident)
+  seats_per_av: 4
+  av_speed_factor: 1.0          # AVs obey same link speeds as private vehicles
+  initial_staging: destinations # where idle AVs start: destinations | depot | random
+  depot: {lat: 34.1500, lon: -118.1520}
+
+# Common dispatch rules — identical across policies so comparisons isolate the
+# policy under study (requirement 7). Only the fields in each policy block differ.
+dispatch_common:
+  control_step_s: 30            # controller re-plans every 30 s
+  assignment: nearest_idle      # greedy nearest-idle AV to a pending request
+  max_pickup_detour_s: 1800     # give up on a request if no AV can reach in time
+  reassess_accepted_trips: true # re-check accepted trips when conditions change
+  boarding_time_s: 60           # time to board passengers once AV arrives (tracked separately)
+
+# ---- The four policies (requirement 7) -------------------------------------
+policies:
+
+  withdrawal:                   # A
+    description: "Stop accepting NEW pickups when withdrawal triggered."
+    withdrawal_trigger:
+      type: forecast_front_within_m
+      value: 1200               # trigger when forecast front within 1.2 km of service area centroid
+    onboard_passengers: complete_dropoff_at_safety
+    assigned_but_not_boarded: cancel_and_reoffer   # released back to pending (may go unserved)
+    retreat: nearest_destination
+
+  normal:                       # B
+    description: "First-come, first-served. No vulnerability priority."
+    priority: fcfs
+
+  evac_priority:                # C
+    description: "Prioritize carless households + explicit assistance needs."
+    priority: vulnerability_first
+    priority_keys: [no_vehicle, assistance_need]   # sort order
+
+  adaptive_geofencing:          # D
+    description: >
+      Evacuation priority PLUS trip screening: accept a request only if
+      estimated (pickup + boarding + evacuation travel) completes before the
+      FORECAST hazard reaches any point along BOTH the pickup journey and the
+      passenger journey, minus safety margin.
+    priority: vulnerability_first
+    priority_keys: [no_vehicle, assistance_need]
+    screening:
+      check_pickup_journey: true
+      check_passenger_journey: true
+      use_forecast: true        # uses hazard forecast layer, never ground truth
+      reject_if_infeasible: true
+    # Ablation (requirement 7): geofencing MAY also change retreat behavior.
+    # Keep retreat identical to others by default; ablation toggles it.
+    retreat_changes: false      # false => retreat identical to other policies

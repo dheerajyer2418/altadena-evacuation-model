@@ -1,0 +1,50 @@
+# ============================================================================
+# EXPERIMENTS — identical population + hazard across policies; separate seeds
+# ============================================================================
+includes:
+  study: config/study.yaml
+  population: config/population.yaml
+  network: config/network.yaml
+  behavior: config/behavior.yaml
+  hazard: config/hazard.yaml
+  fleet: config/fleet.yaml
+
+sim:
+  horizon_s: 14400              # 4 hours
+  step_s: 10                    # mesoscopic traffic time step (seconds)
+  # Separate, reproducible random streams (requirement 9):
+  seeds:
+    population: 12345           # fixed so all policies share ONE population
+    behavior: [101, 102, 103]  # repeated behavior/demand realizations
+    dispatch: [201, 202, 203]  # repeated dispatch stochasticity
+    hazard: [301, 302, 303]    # repeated forecast-error realizations
+
+# A manageable starting set (requirement 9).
+scenarios:
+
+  baseline_no_av:
+    hazard: foothill_santa_ana
+    fleet_size: 0               # no-AV baseline
+    policy: normal              # ignored at size 0
+    description: "No-AV baseline: carless households are stranded demand."
+
+  av_sweep:
+    hazard: foothill_santa_ana
+    policies: [withdrawal, normal, evac_priority, adaptive_geofencing]
+    fleet_sizes: [0, 100, 300, 600]   # explicit AV counts incl. zero
+    description: "Policy x fleet-size grid on identical pop + hazard."
+
+  geofencing_ablation:
+    hazard: foothill_santa_ana
+    fleet_size: 300
+    policy: adaptive_geofencing
+    variants:
+      - {name: screen_only,      retreat_changes: false}
+      - {name: screen_and_retreat, retreat_changes: true}
+    description: "Separate screening effect from retreat-behavior change."
+
+# Reporting horizon metrics (requirement 9)
+reporting:
+  breakdown_by: [neighborhood, vehicle_access, assistance_need]
+  completion_curve: true
+  report_incomplete_clearance: true   # only report full clearance if everyone reaches safety

@@ -1,0 +1,69 @@
+# ============================================================================
+# EVACUATION BEHAVIOR TIMELINE  (all times in SECONDS from scenario t=0)
+# ============================================================================
+# Five separable stages per household (requirement 5). Each stage draws a
+# duration from a configurable distribution. Dr. Grajdura can swap any of these.
+#
+#   t_aware     : household becomes aware of the fire     (awareness time)
+#   + t_prepare : preparation / mobilization time
+#   + t_request : (AV households) time to request a ride
+#   -> departure (private) OR pickup (AV)
+#   -> travel on network -> arrival at safety
+#
+# These are GENERIC placeholder distributions, NOT Camp Fire coefficients.
+# For the labeled Camp Fire transfer scenario see `campfire_transfer` below.
+
+timeline:
+  # Awareness relative to hazard. "hazard_relative" means drawn as an offset
+  # from the modeled fire-detection time; cross-checked against hazard.yaml.
+  awareness:
+    distribution: lognormal
+    # median ~15 min, spread; seconds
+    median_s: 900
+    sigma: 0.6
+    anchored_to: hazard_detection   # hazard_detection | scenario_start
+  preparation:
+    distribution: lognormal
+    median_s: 1200                  # ~20 min to mobilize
+    sigma: 0.5
+  av_request_delay:
+    distribution: lognormal
+    median_s: 300                   # ~5 min from decision to request
+    sigma: 0.4
+    applies_to: carless_or_assistance   # who requests AVs by default
+
+# --- Communication availability (requirement 7) -----------------------------
+communication:
+  smartphone_ownership_prob: 0.9    # distinct from network availability
+  network_available: true           # functioning comms network?
+  outage_windows: []                # e.g. [{start_s: 0, end_s: 1800}] knocks out requests
+  no_comms_behavior: delay_request  # delay_request | cannot_request
+
+# --- Mode / departure logic -------------------------------------------------
+mode_choice:
+  # Households WITH >=1 usable vehicle drive themselves (one trip per vehicle
+  # needed to carry all members; multi-trip if members > seats*vehicles).
+  # Households WITHOUT a usable vehicle request an AV (if fleet>0) else are
+  # "stranded demand" and reported explicitly.
+  seats_per_vehicle: 4              # usable seats; override per-vehicle possible
+  willing_to_share_av: true
+  max_av_wait_before_selfhelp_s: 5400   # after this wait, counted as unserved
+
+presence:
+  # Which household members are present at t=0 (ties to study.yaml presence_factor).
+  scenario_time_of_day: early_morning
+  member_present_prob: 0.95
+
+# --- OPTIONAL: Camp Fire (2018) transfer scenario ---------------------------
+# Grajdura, Borjigin & Niemeier (2022), "Fast-moving dire wildfire evacuation
+# simulation". DISABLED by default. These are OBSERVATIONAL associations from a
+# DIFFERENT fire (Paradise, CA) and are NOT validated for Altadena. Enabling
+# treats them as a transfer hypothesis ONLY. Original variable coding and time
+# reference must be preserved — see docs/ASSUMPTIONS.md and campfire.py.
+campfire_transfer:
+  enabled: false
+  citation: "Grajdura, S., Borjigin, S., Niemeier, D. (2022). Transportation Research Part D."
+  time_reference: "minutes after first official alert (Camp Fire, 2018-11-08)"
+  caveat: "Observational; not causal; not validated for Altadena; small survey N."
+  # Coefficients are defined in altadena_evac/behavior/campfire.py with full
+  # provenance, loaded ONLY when enabled here.

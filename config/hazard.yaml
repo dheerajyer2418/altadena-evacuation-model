@@ -1,0 +1,68 @@
+# ============================================================================
+# FIRE HAZARD SCENARIOS  (HYPOTHETICAL, reproducible, time-dependent)
+# ============================================================================
+# Two strictly separated layers (requirement 6):
+#   ground_truth : what actually happens in the sim (closes roads, exposes cells)
+#   forecast     : what the AV controller is allowed to see (ground_truth +
+#                  configurable error + lead-time). The controller MUST NOT read
+#                  ground_truth unless perfect_information: true.
+
+scenarios:
+
+  # ---- Primary hypothetical: fast-moving foothill fire, spreads SW ----------
+  foothill_santa_ana:
+    description: >
+      Hypothetical wind-driven fire igniting in the San Gabriel foothills north
+      of Altadena, spreading south/southwest under Santa Ana winds. NOT a
+      reconstruction of the Eaton Fire.
+    detection_time_s: 0
+    # Front modeled as an expanding front from an ignition point. A road link or
+    # residential cell is "exposed" when the front passes its location.
+    ignition:
+      lat: 34.2180
+      lon: -118.1250
+    spread:
+      model: radial_front         # radial_front | polygon_series
+      # Illustrative hypothetical front speed. The paper describes a FAST, dire
+      # fire; however a front so fast that it traps nearly everyone regardless of
+      # policy leaves no room to compare AV policies. 0.6 m/s (~2 km/h) keeps the
+      # scenario dire while preserving an evacuation window. EDITABLE — see
+      # docs/ASSUMPTIONS.md; this is NOT a calibrated Altadena value.
+      speed_mps: 0.6
+      direction_bias_deg: 215     # pushed toward SW (Santa Ana)
+      anisotropy: 1.6             # faster downwind than cross/upwind
+    # A link CLOSES when exposure fraction along it exceeds this:
+    link_close_exposure: 0.5
+    # Exposure semantics (requirement 6): exposure != injury/death.
+    exposure_metric:
+      definition: >
+        A person is "exposed" if their vehicle (or they, if still at origin) is
+        within exposure_radius_m of the fire front at any sim step. Exposure is
+        a hazard-contact indicator, NOT a casualty.
+      exposure_radius_m: 150
+
+    forecast:
+      perfect_information: false
+      lead_time_s: 600            # controller sees front position 10 min ahead...
+      position_error_m: 300       # ...with this 1-sigma spatial error
+      speed_error_frac: 0.25      # and this fractional speed error
+      safety_margin_s: 300        # geofencing adds this buffer to arrival checks
+
+  # ---- Controlled test scenario: single road closes at a known time --------
+  toy_single_closure:
+    description: "Deterministic closure for unit tests; no stochastic front."
+    detection_time_s: 0
+    spread: {model: scripted}
+    scripted_closures:            # (edge_uv, close_time_s)
+      - {u: 1, v: 2, close_time_s: 300}
+    exposure_metric: {definition: "within radius of scripted point", exposure_radius_m: 50}
+    forecast: {perfect_information: true, lead_time_s: 0, position_error_m: 0,
+               speed_error_frac: 0.0, safety_margin_s: 0}
+
+# Vehicles caught on a link when it closes (requirement 6): they are NOT deleted.
+on_closure:
+  trapped_vehicle_policy: hold_and_expose
+  # hold_and_expose: vehicle stops at closure; passengers accrue exposure; if a
+  #   reroute exists from the current node it may still escape, else recorded as
+  #   "did not reach safety" with exposure duration.
+  allow_reroute_if_available: true

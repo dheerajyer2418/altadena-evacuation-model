@@ -1,0 +1,29 @@
+# Real data and run artifacts are NOT version-controlled.
+data/raw/
+data/interim/
+data/processed/
+outputs/
+*.graphml
+*.gpkg
+
+# INRIX data & credentials MUST stay out of version control.
+inrix/
+*.inrix
+.env
+*census_api_key*
+secrets.*
+
+# osmnx HTTP cache
+cache/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Keep fixtures (synthetic, safe to commit) and config.
+!fixtures/
+!config/

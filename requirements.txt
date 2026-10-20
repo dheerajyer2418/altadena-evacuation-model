@@ -1,0 +1,19 @@
+# Pinned to versions verified working on Python 3.14.5 (Windows), 2026-10.
+# Core simulation + tests + offline demo need only the first block.
+numpy==2.5.2
+pandas==3.0.3
+scipy==1.18.1
+networkx==3.7
+matplotlib==3.11.0
+pyyaml==6.0.3
+pytest==9.1.1
+
+# Real-data acquisition (Census ACS + OpenStreetMap). Not needed for tests/demo.
+requests==2.34.2
+shapely==2.2.0
+pyproj==3.8.0
+geopandas==1.2.0
+osmnx==2.1.1
+
+# Optional: SUMO backend uses `traci`, shipped with an Eclipse SUMO install
+# (set SUMO_HOME). Not installed via pip here; the default engine is custom.

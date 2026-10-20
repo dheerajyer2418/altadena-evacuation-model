@@ -1,0 +1,80 @@
+# ============================================================================
+# SYNTHETIC POPULATION — ACS marginals + PUMS donor households via IPF/IPU
+# ============================================================================
+# See docs/ASSUMPTIONS.md section "Population synthesis" for the full method and
+# its limitations. We fit household + person constraints jointly, not
+# independently, and report fitting error.
+
+# --- ACS summary tables used as MARGINAL constraints ------------------------
+# Verified universes/definitions documented in DATA_MANIFEST.md.
+tables:
+  B01001: {name: "Sex by Age",                         universe: "Total population"}
+  B02001: {name: "Race",                               universe: "Total population"}
+  B03003: {name: "Hispanic or Latino Origin",          universe: "Total population"}  # ethnicity SEPARATE from race
+  B08201: {name: "Household Size by Vehicles Available", universe: "Households"}
+  B11016: {name: "Household Type by Household Size",    universe: "Households"}
+  B18101: {name: "Sex by Age by Disability Status",     universe: "Civilian noninstitutionalized population"}
+  B19001: {name: "Household Income",                   universe: "Households"}
+  B26001: {name: "Group Quarters Population",          universe: "Population in group quarters"}
+
+# --- PUMS donor source ------------------------------------------------------
+# PUMS geography (PUMA) is BROADER than Altadena. Altadena falls in LA County
+# PUMAs; we draw donor households from the containing PUMA(s) and reweight to
+# Altadena block-group marginals. This is a documented approximation.
+pums:
+  dataset: acs/acs5/pums
+  year: 2023
+  pumas: ["03724", "03725"]   # LA County PUMAs covering Altadena/NW Pasadena (verify at runtime)
+  note: "PUMA list verified against TIGER PUMA boundaries in acquire_data.py."
+
+# --- Fitting method ---------------------------------------------------------
+fitting:
+  method: ipu                 # ipu = Iterative Proportional Updating (person+household)
+  fallback_method: ipf        # if IPU does not converge
+  max_iter: 200
+  tolerance: 1.0e-4
+  # Which marginals constrain the fit (must exist as tables above):
+  household_controls: [hh_size, vehicles, income_bracket]
+  person_controls: [age_bracket, sex, race, hispanic, disability]
+  report_fit_error: true      # write per-control TAE / SRMSE to population report
+
+# --- Attribute coding (kept explicit; Dr. Grajdura can edit) ----------------
+coding:
+  age_brackets: [[0,4],[5,17],[18,34],[35,64],[65,74],[75,120]]
+  vehicles_categories: [0, 1, 2, 3]   # 3 = "3 or more"
+  # Race categories kept SEPARATE from Hispanic ethnicity (two attributes).
+  race_categories: [white, black, native, asian, nhpi, other, two_or_more]
+  hispanic: [hispanic, not_hispanic]
+
+# --- Group quarters ---------------------------------------------------------
+group_quarters:
+  include: false
+  limitation: >
+    GQ population (B26001) is EXCLUDED from the evacuating household synthesis in
+    v0.1 and reported separately as a known limitation. Altadena GQ is small but
+    nonzero. Enabling requires a GQ facility layer and a non-household travel model.
+
+# --- Behavioral guards (requirements 2) -------------------------------------
+guards:
+  no_behavior_from_race: true        # race MUST NOT drive evacuation behavior
+  disability_implies_nothing: true   # disability alone != cannot drive / needs AV
+  # "assistance need" is a SEPARATE, explicitly modeled attribute (see below).
+
+# --- Assistance need (separate from disability) -----------------------------
+# A household-level flag used by evacuation-priority / geofencing policies.
+# Derived probabilistically and documented; NOT equal to disability.
+assistance_need:
+  description: >
+    Probability a household requires AV accessibility assistance, conditioned on
+    presence of a member with an ambulatory/self-care disability AND no household
+    vehicle. This is a MODELING ASSUMPTION, editable here, not a census fact.
+  base_prob_if_disability_and_no_vehicle: 0.6
+  base_prob_if_disability_with_vehicle: 0.1
+  base_prob_otherwise: 0.02
+
+# --- Residential placement --------------------------------------------------
+placement:
+  method: osm_buildings       # osm_buildings | landuse_residential | bbox_random
+  fallback: landuse_residential
+  final_fallback: bbox_random # LABELED in output if used
+  seed: 12345

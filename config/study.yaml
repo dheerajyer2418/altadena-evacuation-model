@@ -1,0 +1,74 @@
+# ============================================================================
+# STUDY DEFINITION — Altadena, CA wildfire evacuation (HYPOTHETICAL scenarios)
+# ============================================================================
+# This file defines the geographic scope and the three population concepts the
+# project keeps strictly separate (see docs/ASSUMPTIONS.md).
+
+study_name: altadena_pre_2025_baseline
+
+# --- Population baseline reference period -----------------------------------
+# Pre-January-2025 Altadena is the intended baseline for HYPOTHETICAL scenarios.
+# We use ACS 5-year estimates (2019-2023 released Dec 2024) as the pre-fire
+# baseline. Documented in DATA_MANIFEST.md.
+acs:
+  dataset: acs/acs5          # 5-year estimates
+  year: 2023                 # 2019-2023 5-year period (pre-Eaton-Fire)
+  reference_period: "2019-2023 (ACS 5-year), released 2024-12"
+
+# --- Geography --------------------------------------------------------------
+# Altadena is an unincorporated CDP in Los Angeles County (state 06, county 037).
+# We pull block groups whose centroid falls in the Altadena CDP, plus a buffer.
+geography:
+  state_fips: "06"
+  county_fips: "037"
+  place_name: "Altadena CDP"
+  place_fips: "01290"        # 2020 Census place code for Altadena CDP, CA
+  # Analysis unit for marginals. Block group preferred; tract fallback.
+  summary_level: block_group   # block_group | tract
+
+# --- Three population concepts (kept separate everywhere downstream) ---------
+population_concepts:
+  census_baseline:
+    description: >
+      ACS resident population of the Altadena CDP block groups. A nighttime,
+      usual-residence concept. ~42,000-43,000 persons historically.
+  present_during_evacuation:
+    description: >
+      Estimated population physically present when a hypothetical fire starts.
+      Modeled as census_baseline x presence_factor (time-of-day dependent).
+    presence_factor: 0.92     # placeholder; night/early-AM scenario. See behavior.yaml.
+    note: "Does NOT add visitors/commuters-in. A documented simplification."
+  within_evacuation_area:
+    description: >
+      Subset inside the ordered evacuation polygon for a given scenario. Defined
+      per-hazard in config/hazard.yaml via the warning/evacuation zones.
+
+# --- Study boundary vs network extent ---------------------------------------
+# The DEMAND boundary (where households live) is the Altadena CDP block groups.
+# The NETWORK extent is larger so vehicles can physically reach safety OUTSIDE
+# Altadena. We buffer the demand bbox outward before downloading roads.
+boundary:
+  # Approx Altadena CDP bounding box (WGS84). Refined to actual CDP polygon at runtime.
+  demand_bbox: {north: 34.2300, south: 34.1720, east: -118.0850, west: -118.1800}
+  network_buffer_m: 3000      # extend road network 3 km beyond demand bbox
+                              # (reaches I-210 + into Pasadena; keeps Overpass pull tractable)
+
+# --- Destinations (safety / evacuation sinks) -------------------------------
+# Evacuees exit the network toward the south/southwest, away from the San Gabriel
+# foothills. Destinations are network nodes nearest these points; vehicles that
+# reach ANY destination are counted "reached safety".
+destinations:
+  strategy: named_points      # named_points | network_boundary
+  points:
+    - {name: "I-210 @ Lincoln Ave",   lat: 34.1680, lon: -118.1600}
+    - {name: "I-210 @ Lake Ave",      lat: 34.1670, lon: -118.1310}
+    - {name: "I-210 @ Allen Ave",     lat: 34.1665, lon: -118.1120}
+    - {name: "SR-134 W (via Pasadena)", lat: 34.1500, lon: -118.1500}
+    - {name: "South (Fair Oaks/Pasadena)", lat: 34.1480, lon: -118.1520}
+  note: >
+    These approximate real southbound egress toward the 210 freeway and
+    Pasadena. Destinations are a modeling choice, NOT an evacuation order.
+
+crs:
+  geographic: EPSG:4326       # WGS84 (lat/lon) for I/O
+  projected: EPSG:26911       # NAD83 / UTM 11N — meters, for distances in SoCal

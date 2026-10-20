@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "altadena-evac"
+version = "0.1.0"
+description = "Agent-based wildfire evacuation model for Altadena, CA with AV dispatch policies"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "HI-LAB / UIC" }]
+
+[tool.setuptools.packages.find]
+include = ["altadena_evac*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100

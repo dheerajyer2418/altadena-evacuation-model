@@ -1,0 +1,57 @@
+# ============================================================================
+# ROAD NETWORK — OpenStreetMap -> directed, routable mesoscopic network
+# ============================================================================
+source:
+  provider: openstreetmap
+  via: osmnx                   # osmnx 2.1.1
+  network_type: drive          # drivable public roads only
+  # OSM is a CURRENT snapshot. We record the download date; it is NOT the
+  # January-2025 network and must not be described as such.
+  snapshot_date_field: downloaded_at   # stamped into interim/network_meta.json
+  note: >
+    OSM road geometry is a current snapshot at download time. Road closures,
+    construction, or post-fire changes are NOT reflected unless configured in
+    config/hazard.yaml.
+
+# --- Edge attributes preserved / imputed ------------------------------------
+edges:
+  keep_oneway: true            # directed edges; one-way restrictions preserved
+  length_from: osm             # meters, from OSM geometry (projected CRS)
+  speed:
+    source: osm_maxspeed_then_default
+    # Defaults (km/h) by OSM highway class when maxspeed is missing. Provenance:
+    # typical US urban defaults; FLAGGED as imputed in edge table ('speed_source').
+    defaults_kmh:
+      motorway: 105
+      trunk: 90
+      primary: 65
+      secondary: 55
+      tertiary: 45
+      residential: 40
+      unclassified: 40
+      living_street: 15
+      service: 20
+  lanes:
+    source: osm_lanes_then_default
+    defaults:                  # per direction
+      motorway: 3
+      trunk: 2
+      primary: 2
+      secondary: 1
+      tertiary: 1
+      residential: 1
+      service: 1
+  capacity:
+    # Per-lane saturation flow -> link discharge capacity (veh/hour/lane).
+    # Provenance: HCM-style urban default; editable. FLAGGED as assumption.
+    per_lane_veh_hour: 1800
+    jam_density_veh_km_lane: 130   # storage: vehicles per km per lane at jam
+
+# --- Connectivity checks ----------------------------------------------------
+checks:
+  require_strongly_connected_to_destinations: true
+  drop_unreachable: false      # DO NOT silently delete; report instead
+  report_disconnected: true
+
+cache:
+  graphml: data/interim/altadena_drive.graphml
