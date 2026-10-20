@@ -62,11 +62,21 @@ None is configured in this environment, so no ACS data was pulled. Set
 Altadena block-group marginals by IPU. PUMA breadth is a documented
 approximation; GQ (TYPE≠1) excluded (see limitation below).
 
-## 4. TIGER/Line boundaries — **interface only**
+## 4. TIGER/Line boundaries — **used (live, no key)**
 
-Used only to select which block groups fall in Altadena and to place households
-in polygons. **Not** treated as demographic data. Requires the Census key path to
-be active (block-group selection) and is not exercised offline.
+| field | value |
+|---|---|
+| Source | `www2.census.gov/geo/tiger/TIGER2023/` (PLACE + BG) via `geopandas`/`pyogrio` |
+| Geography | CA places + CA block groups, filtered to LA County |
+| Vintage | 2023 (matches ACS year) |
+
+Used to select which block groups fall in Altadena and to place households in the
+correct polygons. **Not** treated as demographic data. **Verified live:** selects
+**34 Altadena CDP block groups across 8 tracts** (4601.01, 4602, 4603.01/02, 4610,
+4611, 4612, 4613); bbox ≈ (−118.179, 34.169)–(−118.090, 34.220). Selection rule:
+block-group centroid inside the Altadena CDP polygon. This runs **without an API
+key** (`altadena_evac/data/tiger.py`); the selected GEOIDs are the join keys for
+the ACS pull once a key is present.
 
 ## 5. INRIX — **no data supplied; documented interface only**
 

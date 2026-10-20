@@ -76,6 +76,14 @@ def test_race_does_not_drive_behavior():
         assert ha.stranded == hb.stranded
 
 
+def test_tracts_from_geoids():
+    """Tract extraction from 12-digit block-group GEOIDs (offline unit test of the
+    TIGER->ACS selection glue)."""
+    from altadena_evac.data.tiger import tracts_from_geoids
+    geoids = ["060374601011", "060374601012", "060374611001"]
+    assert tracts_from_geoids(geoids) == ["460101", "461100"]
+
+
 def test_disability_alone_does_not_imply_nondriver():
     pop, _ = _pop()
     # there must exist disabled persons who are drivers (disability != cannot drive)

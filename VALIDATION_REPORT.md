@@ -89,6 +89,15 @@ for avoiding sending vehicles into forecast hazard. Normal and evacuation-priori
 coincide when the fleet is ample; they diverge only under fleet scarcity (the
 priority mechanism is unit-tested).
 
+## Real-population path status (updated)
+- **Altadena block-group selection — ✅ done & live-verified.** `data/tiger.py`
+  selects **34 Altadena CDP block groups (8 tracts)** from TIGER 2023 with no API
+  key. `population/build_real.py` wires TIGER → ACS (subset to those GEOIDs) →
+  PUMS donors → IPU → OSM-building placement, and activates automatically when
+  `CENSUS_API_KEY` is set (`scripts/build_population.py`, `runner.prepare`).
+- **Still needs a key to run** the ACS/PUMS download itself, and the ACS cell
+  mappings below need verification before the real numbers are trusted.
+
 ## Needs Dr. Grajdura's review
 1. ACS table cell mappings and universes (esp. B08201, B18101) before real runs.
 2. PUMA selection for donors; group-quarters handling.

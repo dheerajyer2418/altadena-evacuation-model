@@ -39,19 +39,32 @@ def main():
               f"(snapshot {meta['downloaded_at']}) -> {out}")
         manifest["acquired"].append({"source": "OpenStreetMap", **meta})
 
-    # 2) ACS tables (needs key)
+    # 2) TIGER block-group selection for Altadena (no key required)
+    geoids = None
+    if not args.skip_census:
+        from altadena_evac.data import tiger
+        try:
+            geoids, _bg_gdf, place = tiger.select_altadena_block_groups(study)
+            tracts = tiger.tracts_from_geoids(geoids)
+            print(f"  TIGER: selected {len(geoids)} Altadena block groups across "
+                  f"{len(tracts)} tracts {tracts}")
+            manifest["acquired"].append({"source": "TIGER", "n_block_groups": len(geoids),
+                                         "tracts": tracts})
+        except Exception as e:  # noqa: BLE001
+            print(f"  TIGER selection failed: {type(e).__name__}: {e}")
+
+    # 3) ACS tables (needs key) — subset to the Altadena block groups above
     if not args.skip_census:
         geo = study["geography"]
         try:
             df = acs_group(study["acs"]["year"], study["acs"]["dataset"], "B01001",
-                           state=geo["state_fips"], county=geo["county_fips"],
-                           tract="*")
-            # NOTE: this returns the whole county; selecting Altadena block groups
-            # requires a TIGER place/tract filter (see docstring in census.py).
-            print(f"  ACS B01001 pulled: {len(df)} block groups (county-wide; "
-                  f"filter to Altadena with TIGER).")
+                           state=geo["state_fips"], county=geo["county_fips"], tract="*")
+            n_alt = len(df.index.intersection(geoids)) if geoids is not None else None
+            print(f"  ACS B01001 pulled: {len(df)} county block groups; "
+                  f"{n_alt} fall in Altadena.")
             manifest["acquired"].append({"source": "ACS", "table": "B01001",
-                                         "n_block_groups": int(len(df))})
+                                         "n_block_groups_county": int(len(df)),
+                                         "n_block_groups_altadena": n_alt})
         except CensusAPIError as e:
             print("  ACS pull SKIPPED — missing credentials / input:")
             print("   ", str(e))

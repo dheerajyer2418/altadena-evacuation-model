@@ -8,6 +8,7 @@ reproducible (requirement 9).
 from __future__ import annotations
 
 import copy
+import os
 
 import numpy as np
 
@@ -60,9 +61,10 @@ def prepare(cfg, mode: str, seed: int):
     """Return (G, destinations, placed base population) for a run mode.
 
     mode == 'toy'      : synthetic toy grid + synthetic population.
-    mode == 'altadena' : real OSM network (data/interim graphml) + synthetic
-                         population placed on it. Real Census population activates
-                         automatically when CENSUS_API_KEY is available.
+    mode == 'altadena' : real OSM network (data/interim graphml). Uses the REAL
+                         ACS/PUMS Census population + OSM-building placement when
+                         CENSUS_API_KEY is set; otherwise a labeled SYNTHETIC
+                         population placed on the network.
     """
     if mode == "toy":
         G, dests = build_toy(cfg)
@@ -70,9 +72,21 @@ def prepare(cfg, mode: str, seed: int):
         G, dests = build_altadena_network(cfg)
     else:
         raise ValueError(f"unknown mode {mode}")
-    base_pop = build_offline_population(cfg, seed=seed)
+    net = MesoNetwork(G, dests)
     rng = np.random.default_rng(seed)
-    place_on_network(base_pop, MesoNetwork(G, dests), rng)
+
+    if mode == "altadena" and os.environ.get("CENSUS_API_KEY"):
+        try:
+            from ..population.build_real import build_census_population, place_real
+            base_pop, bg_gdf = build_census_population(cfg, seed=seed)
+            place_real(base_pop, net, bg_gdf, cfg["study"], rng)
+            return G, dests, base_pop
+        except Exception as e:  # noqa: BLE001
+            print(f"  [real population path failed: {type(e).__name__}: {e}]")
+            print("  falling back to SYNTHETIC population.")
+
+    base_pop = build_offline_population(cfg, seed=seed)
+    place_on_network(base_pop, net, rng)
     return G, dests, base_pop
 
 

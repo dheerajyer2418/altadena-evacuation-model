@@ -22,11 +22,22 @@ def main():
     args = ap.parse_args()
     cfg = load_config(args.config)
 
+    seed = cfg["sim"]["seeds"]["population"]
     has_key = bool(os.environ.get("CENSUS_API_KEY"))
-    if not has_key:
+    if has_key:
+        print("CENSUS_API_KEY set -> building REAL ACS/PUMS population for Altadena "
+              "(TIGER block-group selection + IPU synthesis).")
+        try:
+            from altadena_evac.population.build_real import build_census_population
+            pop, _bg_gdf = build_census_population(cfg, seed=seed)
+            print(f"  source: {pop.meta['SOURCE']}")
+        except Exception as e:  # noqa: BLE001
+            print(f"  REAL path failed ({type(e).__name__}: {e}); using SYNTHETIC.")
+            pop = runner.build_offline_population(cfg, seed=seed)
+    else:
         print("CENSUS_API_KEY not set -> building SYNTHETIC offline population "
               "(labeled). Real ACS/PUMS synthesis requires a key.")
-    pop = runner.build_offline_population(cfg, seed=cfg["sim"]["seeds"]["population"])
+        pop = runner.build_offline_population(cfg, seed=seed)
 
     print(f"households: {pop.n_households}, persons: {pop.n_persons}")
     problems = pop.check_integrity()
