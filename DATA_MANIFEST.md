@@ -26,41 +26,58 @@ repository (see `.gitignore`).
   veh/h/lane (HCM-style default, editable in `config/network.yaml`), storage =
   130 veh/km/lane jam density. These are **assumptions, not calibrated** values.
 
-## 2. ACS 5-year detailed tables — **implemented, NOT run here (needs key)**
+## 2. ACS 5-year detailed tables — **used (live)**
 
 | field | value |
 |---|---|
 | Source | `api.census.gov/data/2023/acs/acs5` (ACS 5-year) |
 | Reference period | **2019–2023**, released Dec 2024 (pre-Eaton-Fire baseline) |
 | Geography | block group within tract within LA County (state 06, county 037) |
-| Tables | B01001 (sex×age), B02001 (race), B03003 (hispanic), B08201 (hhsize×vehicles), B11016, B18101 (disability), B19001 (income), B26001 (GQ) |
+| Tables used (block-group level) | B01001 (sex×age), B02001 (race), B03003 (hispanic), **B25044 (vehicles)**, **B11016 (household size)**, B19001 (income) |
 | Units | person / household counts (estimates) |
 
-**Status:** the importer (`altadena_evac/data/census.py`) is implemented and
-tested against the live API, but **the Census API now requires a free API key**.
-None is configured in this environment, so no ACS data was pulled. Set
-`CENSUS_API_KEY` and re-run `scripts/acquire_data.py` to activate the real pull.
+**Status:** pulled live with an activated `CENSUS_API_KEY`. Verified against raw
+ACS totals across the 34 Altadena block groups: synthesized population 41,341 vs
+ACS 41,662 (−0.8%); households 15,099 vs 14,915 (+1.2%).
 
-**Universe caveats (must be verified before use — requirement 2):**
-- B18101 universe is the **civilian noninstitutionalized population**, not total
-  population; combining its disability share with B01001 totals is an
-  approximation.
-- B02001 (race) and B03003 (Hispanic ethnicity) are kept as **separate
-  attributes**, never merged.
-- The B08201 cell→(size,vehicles) mapping in `census.py` is a documented
-  simplification and should be checked against the current ACS table shell.
+**Table-availability finding (requirement 2 — verify coverage):** `B08201`
+(hhsize×vehicles) and `B18101`/`C18108` (disability) are **NULL at block-group
+geography** (tract-level only). We therefore use **B25044** (Tenure by Vehicles
+Available) for the vehicle control and **B11016** (Household Type by Size) for the
+size control, both block-group level. **Disability is NOT fitted** (no BG
+marginal) — it is inherited from PUMS donors' real `DIS` flags (age-conditioned);
+`census.tract_disability_rate()` can pull B18101 at tract level for validation.
 
-## 3. ACS PUMS donor households — **implemented, NOT run here (needs key)**
+**Two cell-mapping bugs found & fixed during live verification:**
+- B01001 female age cells are offset **+24** from male cells (`_026` is the female
+  header, not ages 0–4) — a +23 offset had mislabeled total-females as ages 0–4.
+- B19001 income bracket `_002` is index **0** (not 1), to match the PUMS income
+  mapping.
+After fixes, mean per-block-group SRMSE = **0.060** (range 0.003–0.24).
+
+**Universe caveats:** B02001 (race) and B03003 (Hispanic ethnicity) kept as
+**separate attributes**. Person controls (B01001, universe = total population) and
+household controls (B25044/B11016, universe = occupied housing units) have
+different universes; IPU reconciles them and residual error is reported per block
+group.
+
+## 3. ACS PUMS donor households — **used (live)**
 
 | field | value |
 |---|---|
 | Source | `api.census.gov/.../acs5/pums`, 2023 5-year |
-| Geography | **PUMA** (broader than Altadena): LA County PUMAs covering Altadena |
-| Variables | HH: SERIALNO, WGTP, NP, VEH, HINCP, TYPE; Person: AGEP, SEX, RAC1P, HISP, DIS |
+| Geography | **PUMA** (broader than Altadena): PUMAs 03724, 03725 |
+| Variables | HH: SERIALNO, WGTP, NP, VEH, HINCP, **TYPEHUGQ**; Person: AGEP, SEX, RAC1P, HISP, DIS |
+
+**Status:** pulled live; ~6,310 donor households. Note: ACS PUMS renamed `TYPE`→
+`TYPEHUGQ` (2019+); households are `TYPEHUGQ==1` (group quarters excluded).
 
 **Assumptions:** donors drawn from the containing PUMA(s) and reweighted to
-Altadena block-group marginals by IPU. PUMA breadth is a documented
-approximation; GQ (TYPE≠1) excluded (see limitation below).
+Altadena block-group marginals by IPU. PUMA breadth is a documented approximation.
+**Known fit limitation:** synthesized carless rate 4.5% vs ACS 3.7% — carless
+households are rare (≈550 across 34 BGs) so small-count/donor-pool effects
+overstate them slightly. Flagged for review since carless households are the
+research focus; a stronger vehicle constraint or post-calibration could tighten it.
 
 ## 4. TIGER/Line boundaries — **used (live, no key)**
 

@@ -33,16 +33,22 @@ End-to-end runs confirmed: offline demo (`scripts.run_demo`), baseline on the
 **real Altadena network** (`scripts.run_scenario --mode altadena`), and a policy
 comparison on both toy and real networks.
 
-## 2. Population fit — ⚠️ partial, on SYNTHETIC inputs only
+## 2. Population fit — ✅ measured on REAL Altadena ACS (good fit)
 
-- The IPU synthesizer reports per-block-group **TAE and SRMSE** and lists
-  unsupported combinations. On the synthetic offline marginals, mean SRMSE is
-  ~0.001 (near-perfect, because those marginals are tallied from the donor pool —
-  this verifies the fitter, it does **not** validate against Altadena).
-- **No real ACS population was synthesized** in this environment (Census API key
-  required). Real population fit against Altadena marginals is therefore
-  **unmeasured**. With a key, `scripts.build_population` produces the fit report
-  to review.
+- **Real population synthesized** from live ACS 2019–2023 + PUMS (activated key):
+  **15,099 households / 41,341 persons** across 34 Altadena block groups.
+- Validated against raw ACS totals: population −0.8%, households +1.2%.
+- IPU fit: **mean per-block-group SRMSE 0.060** (range 0.003–0.24); per-control
+  TAE/unsupported reported in `data/processed/population_fit_report.json`.
+- **Known gap:** synthesized carless rate **4.5% vs ACS 3.7%** — carless
+  households are rare, so small-count/donor-pool effects overstate them. Because
+  carless households are the research focus, treat the absolute carless count as
+  approximate pending a stronger vehicle constraint or post-calibration.
+- Two ACS cell-mapping bugs (female-age offset, income-bracket index) were found
+  and fixed during this live verification — see DATA_MANIFEST.md.
+- B18101 disability is NULL at block group, so disability is **inherited from
+  PUMS donors** (not fitted); its distribution is realistic but not constrained to
+  Altadena BG marginals.
 
 ## 3. Traffic calibration — ❌ none
 

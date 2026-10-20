@@ -20,7 +20,9 @@ from .census import CensusAPIError
 
 BASE = "https://api.census.gov/data"
 
-HH_VARS = ["SERIALNO", "WGTP", "NP", "VEH", "HINCP", "TYPE"]
+# NOTE: ACS PUMS renamed TYPE -> TYPEHUGQ in 2019+ (type of housing unit/GQ).
+# TYPEHUGQ == 1 is a housing unit (household); 2/3 are group quarters.
+HH_VARS = ["SERIALNO", "WGTP", "NP", "VEH", "HINCP", "TYPEHUGQ"]
 PERSON_VARS = ["SERIALNO", "SPORDER", "AGEP", "SEX", "RAC1P", "HISP", "DIS", "PWGTP"]
 
 
@@ -58,8 +60,8 @@ def fetch_donors(year: int, state: str, pumas: list[str],
         hh[c] = pd.to_numeric(hh[c], errors="coerce")
     for c in ["AGEP", "SEX", "RAC1P", "HISP", "DIS", "PWGTP", "SPORDER"]:
         pp[c] = pd.to_numeric(pp[c], errors="coerce")
-    # Keep only occupied housing units (TYPE==1) i.e. households, not GQ.
-    hh = hh[pd.to_numeric(hh["TYPE"], errors="coerce") == 1]
+    # Keep only housing units (TYPEHUGQ==1) i.e. households, not group quarters.
+    hh = hh[pd.to_numeric(hh["TYPEHUGQ"], errors="coerce") == 1]
     hh = hh.drop_duplicates("SERIALNO").set_index("SERIALNO")
     pp = pp[pp["SERIALNO"].isin(hh.index)]
     return hh, pp

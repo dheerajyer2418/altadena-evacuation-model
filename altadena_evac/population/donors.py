@@ -95,20 +95,22 @@ def _tally(hhs, coding) -> dict:
                 return i
         return len(brackets) - 1
 
-    sv, inc, age_sex, race, hisp, dis = {}, {}, {}, {}, {}, {}
+    veh, size, inc, age_sex, race = {}, {}, {}, {}, {}
     hisp = {"hispanic": 0.0, "not_hispanic": 0.0}
-    dis = {"with": 0.0, "without": 0.0}
     for h in hhs:
-        sv[(h["size_cat"], h["veh_cat"])] = sv.get((h["size_cat"], h["veh_cat"]), 0.0) + 1
+        veh[h["veh_cat"]] = veh.get(h["veh_cat"], 0.0) + 1
+        size[h["size_cat"]] = size.get(h["size_cat"], 0.0) + 1
         inc[h["income_bracket"]] = inc.get(h["income_bracket"], 0.0) + 1
         for m in h["members"]:
             k = (m["sex"], abidx(m["age"]))
             age_sex[k] = age_sex.get(k, 0.0) + 1
             race[m["race"]] = race.get(m["race"], 0.0) + 1
             hisp["hispanic" if m["hispanic"] else "not_hispanic"] += 1
-            dis["with" if m["disability"] else "without"] += 1
-    return {"hhsize_vehicles": sv, "income": inc, "age_sex": age_sex,
-            "race": race, "hispanic": hisp, "disability": dis}
+    # Mirrors the real block-group controls (vehicles=B25044, hh_size=B11016,
+    # income=B19001, age_sex=B01001, race=B02001, hispanic=B03003). Disability is
+    # inherited from donors, not fitted (no BG marginal).
+    return {"vehicles": veh, "hh_size": size, "income": inc, "age_sex": age_sex,
+            "race": race, "hispanic": hisp}
 
 
 def make_synthetic(coding, n_block_groups=4, hh_per_bg=(80, 160), seed=0):

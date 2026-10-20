@@ -21,7 +21,10 @@ from .donors import donors_from_pums
 from .placement import place_from_osm, place_on_network
 from .synthesize import synthesize_population
 
-ACS_TABLES = ["B01001", "B02001", "B03003", "B08201", "B18101", "B19001"]
+# Tables available at BLOCK-GROUP geography (verified live). B08201 and B18101 are
+# NULL at block group, so vehicles come from B25044 and size from B11016;
+# disability is inherited from PUMS donors (see census.py / DATA_MANIFEST.md).
+ACS_TABLES = ["B01001", "B02001", "B03003", "B25044", "B11016", "B19001"]
 
 
 def build_census_population(cfg: dict, api_key: str | None = None, seed: int = 12345):

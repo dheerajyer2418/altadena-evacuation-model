@@ -80,8 +80,10 @@ _B01001_MALE = {  # variable -> (age_low, age_high)
     "B01001_021E": (67, 69), "B01001_022E": (70, 74), "B01001_023E": (75, 79),
     "B01001_024E": (80, 84), "B01001_025E": (85, 120),
 }
-# female mirror: add 23 to the male index (003->026, ... 025->049)
-_B01001_FEMALE = {f"B01001_{int(k.split('_')[1][:3]) + 23:03d}E": v
+# Female mirror. B01001 layout: _002 "Male:" header, male age cells _003.._025;
+# _026 "Female:" header, female age cells _027.._049. So the female age cell is
+# the male age cell + 24 (NOT +23 — _026 is the female header, not ages 0-4).
+_B01001_FEMALE = {f"B01001_{int(k.split('_')[1][:3]) + 24:03d}E": v
                   for k, v in _B01001_MALE.items()}
 
 _B02001_RACE = {
@@ -132,17 +134,22 @@ def extract_marginals(tables: dict[str, pd.DataFrame], coding: dict) -> dict:
                 "hispanic": _num(tables["B03003"], g, "B03003_003E"),
                 "not_hispanic": _num(tables["B03003"], g, "B03003_002E"),
             }
-        # households total + hhsize x vehicles (B08201)
-        if "B08201" in tables:
-            rec["n_households"] = _num(tables["B08201"], g, "B08201_001E")
-            rec["hhsize_vehicles"] = _extract_b08201(tables["B08201"], g)
-        # disability flag (B18101): sum "with a disability" cells
-        if "B18101" in tables:
-            rec["disability"] = _extract_b18101(tables["B18101"], g)
-        # income brackets (B19001_002.._017E)
+        # vehicles available (B25044, block-group level) — the critical carless control
+        if "B25044" in tables:
+            rec["vehicles"] = _extract_b25044(tables["B25044"], g)
+            rec["n_households"] = _num(tables["B25044"], g, "B25044_001E")
+        # household size (B11016, block-group level)
+        if "B11016" in tables:
+            rec["hh_size"] = _extract_b11016(tables["B11016"], g)
+            rec.setdefault("n_households", _num(tables["B11016"], g, "B11016_001E"))
+        # income brackets: B19001_002 is bracket index 0 ("Less than $10,000") ...
+        # B19001_017 is index 15 ("$200,000+"), matching donors._income_bracket.
         if "B19001" in tables:
-            rec["income"] = {i - 1: _num(tables["B19001"], g, f"B19001_{i:03d}E")
+            rec["income"] = {i - 2: _num(tables["B19001"], g, f"B19001_{i:03d}E")
                              for i in range(2, 18)}
+        # NOTE: disability (B18101) is NULL at block-group geography, so it is NOT
+        # fitted as a BG marginal; disability is inherited from PUMS donors (real
+        # DIS flags, age-conditioned). See DATA_MANIFEST.md / ASSUMPTIONS.md.
         out[g] = rec
     return out
 
@@ -155,38 +162,57 @@ def _num(df, g, var):
         return 0.0
 
 
-def _extract_b08201(df, g) -> dict:
-    """B08201 Household Size by Vehicles Available -> {(size_idx, veh): count}.
+def _extract_b25044(df, g) -> dict:
+    """B25044 Tenure by Vehicles Available -> {veh_cat: households}, veh in {0,1,2,3+}.
 
-    Size categories: 1,2,3,4+ ; vehicles: 0,1,2,3,4+. We map to synthesizer
-    coding sizes {1,2,3,4} and vehicles {0,1,2,3(=3+)}. Cell codes per ACS:
-      sizes start at _003 (1-person): each size block has 5 vehicle cells.
+    Layout (verified): _001 total; owner block _002(header) _003=no vehicle,
+    _004=1, _005=2, _006=3, _007=4, _008=5+; renter block _009(header) _010=no
+    vehicle, _011=1, _012=2, _013=3, _014=4, _015=5+. Owner+renter are summed per
+    vehicle count; 3/4/5+ collapse to category 3 (matching coding vehicles 0,1,2,3+).
     """
-    out = {}
-    # ACS B08201 layout: _001 total; _002 0veh(all sizes)... actually layout is
-    # total, then by vehicles for all hh, then by size. We use the size x veh
-    # detail cells _003.._027 (5 vehicle cats x ... ). To stay robust we read the
-    # documented detail block; see DATA_MANIFEST.md. Simplified mapping below.
-    size_blocks = {1: 8, 2: 13, 3: 18, 4: 23}  # starting index of veh cells per size
-    for size, start in size_blocks.items():
-        for vcat in range(0, 5):   # 0,1,2,3,4+
-            var = f"B08201_{start + vcat:03d}E"
-            v = _num(df, g, var)
-            vkey = min(vcat, 3)
-            out[(size, vkey)] = out.get((size, vkey), 0.0) + v
+    pairs = {0: ("B25044_003E", "B25044_010E"),
+             1: ("B25044_004E", "B25044_011E"),
+             2: ("B25044_005E", "B25044_012E"),
+             3: ("B25044_006E", "B25044_013E"),
+             4: ("B25044_007E", "B25044_014E"),
+             5: ("B25044_008E", "B25044_015E")}
+    out = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
+    for vcat, (ov, rv) in pairs.items():
+        out[min(vcat, 3)] += _num(df, g, ov) + _num(df, g, rv)
     return out
 
 
-def _extract_b18101(df, g) -> dict:
-    """B18101 Sex by Age by Disability -> {'with': count, 'without': count}.
+def _extract_b11016(df, g) -> dict:
+    """B11016 Household Type by Household Size -> {size_cat: households}, size in {1,2,3,4+}.
 
-    'With a disability' cells are the odd sub-cells within each age block. We sum
-    the documented 'with a disability' variables. Universe: civilian
-    noninstitutionalized population (NOT total population) — documented limitation
-    when combined with B01001 totals."""
+    Layout (verified): family block _002(header) _003=2p _004=3 _005=4 _006=5 _007=6
+    _008=7+; nonfamily block _009(header) _010=1p _011=2p _012=3 _013=4 _014=5 _015=6
+    _016=7+. Size 1 = _010; 2 = _003+_011; 3 = _004+_012; 4+ = the rest.
+    """
+    one = _num(df, g, "B11016_010E")
+    two = _num(df, g, "B11016_003E") + _num(df, g, "B11016_011E")
+    three = _num(df, g, "B11016_004E") + _num(df, g, "B11016_012E")
+    fourplus = sum(_num(df, g, v) for v in
+                   ["B11016_005E", "B11016_006E", "B11016_007E", "B11016_008E",
+                    "B11016_013E", "B11016_014E", "B11016_015E", "B11016_016E"])
+    return {1: one, 2: two, 3: three, 4: fourplus}
+
+
+def tract_disability_rate(year, dataset, state, county, tracts, api_key=None) -> dict:
+    """Optional: tract-level disability share from B18101 (NULL at block group).
+
+    Returns {tract6: with_disability_fraction}. Not used as an IPU control (no BG
+    marginal exists); available for reporting/validation of the donor-inherited
+    disability rate. Universe: civilian noninstitutionalized population."""
+    df = acs_group(year, dataset, "B18101", state=state, county=county,
+                   tract=",".join(tracts) if isinstance(tracts, list) else tracts,
+                   api_key=api_key)
     with_vars = ["B18101_004E", "B18101_007E", "B18101_010E", "B18101_013E",
                  "B18101_016E", "B18101_019E", "B18101_023E", "B18101_026E",
                  "B18101_029E", "B18101_032E", "B18101_035E", "B18101_038E"]
-    total = _num(df, g, "B18101_001E")
-    with_d = sum(_num(df, g, v) for v in with_vars)
-    return {"with": with_d, "without": max(0.0, total - with_d), "universe_total": total}
+    out = {}
+    for g in df.index:
+        total = _num(df, g, "B18101_001E")
+        with_d = sum(_num(df, g, v) for v in with_vars)
+        out[g[5:11]] = (with_d / total) if total else 0.0
+    return out

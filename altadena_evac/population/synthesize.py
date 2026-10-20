@@ -34,16 +34,25 @@ from .agents import Household, Person, Population
 def _build_constraints(targets: dict) -> list[tuple]:
     """Return list of (level, key, target_value). level in {"hh","p"}."""
     cons = []
+    # household controls (block-group level): vehicles (B25044), size (B11016), income
+    for veh, val in targets.get("vehicles", {}).items():
+        cons.append(("hh", ("veh", veh), float(val)))
+    for size, val in targets.get("hh_size", {}).items():
+        cons.append(("hh", ("size", size), float(val)))
+    # legacy joint control, if a caller still provides it
     for (size, veh), val in targets.get("hhsize_vehicles", {}).items():
         cons.append(("hh", ("sv", size, veh), float(val)))
     for b, val in targets.get("income", {}).items():
         cons.append(("hh", ("inc", b), float(val)))
+    # person controls (block-group level): age x sex, race, hispanic
     for (sex, b), val in targets.get("age_sex", {}).items():
         cons.append(("p", ("as", sex, b), float(val)))
     for name, val in targets.get("race", {}).items():
         cons.append(("p", ("race", name), float(val)))
     for name, val in targets.get("hispanic", {}).items():
         cons.append(("p", ("hisp", name), float(val)))
+    # disability is NOT a control (B18101 is NULL at block group); it is inherited
+    # from PUMS donors. See data/census.py and DATA_MANIFEST.md.
     for name, val in targets.get("disability", {}).items():
         if name == "universe_total":
             continue
@@ -60,6 +69,10 @@ def _age_bracket(age: int, brackets) -> int:
 
 def _incidence(donor: dict, key: tuple, brackets) -> float:
     kind = key[0]
+    if kind == "veh":
+        return 1.0 if donor["veh_cat"] == key[1] else 0.0
+    if kind == "size":
+        return 1.0 if donor["size_cat"] == key[1] else 0.0
     if kind == "sv":
         return 1.0 if (donor["size_cat"] == key[1] and donor["veh_cat"] == key[2]) else 0.0
     if kind == "inc":

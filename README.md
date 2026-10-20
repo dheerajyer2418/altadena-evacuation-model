@@ -26,8 +26,8 @@ evacuation policies affect outcomes, **especially for households without private
 | Time-dependent hazard + separate forecast (info boundary enforced) | ✅ working, unit-tested | synthetic |
 | Four AV policies + geofencing ablation | ✅ working, unit-tested | n/a |
 | TIGER Altadena block-group selection (34 BGs, 8 tracts) | ✅ working, live-verified | **live TIGER (no key)** |
-| Census/ACS importer (B01001, B02001, B08201, B18101) | ✅ wired; needs API key to run | **live Census API** |
-| PUMS-donor + IPU household synthesis with fit/joint checks | ✅ working (synthetic now; real on key) | **live Census API** |
+| Census/ACS importer (B01001, B02001, B03003, B25044, B11016, B19001) | ✅ working, live-verified | **live Census API** |
+| PUMS-donor + IPU household synthesis (SRMSE 0.06 vs real ACS) | ✅ working, live-verified | **live Census API (key)** |
 | OSM network build (osmnx) → routable mesoscopic network | ✅ working | **live OSM** |
 | Residential placement from OSM buildings/landuse | ✅ working, fallback labeled | **live OSM** |
 | INRIX importer | ⚠️ documented interface only (no data supplied) | n/a |
