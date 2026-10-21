@@ -498,12 +498,10 @@ function nearestFrame(tt){
 const KIND_COLOR={1:[74,163,255],2:[255,210,74],3:[70,224,122]};
 function buildLayers(){
   const L=[]; const fr=nearestFrame(t);
-  // Google-Maps-style raster basemap (CARTO Voyager; no token needed)
+  // Real street basemap — OpenStreetMap standard tiles (no API key required)
   if(layersState.map)
     L.push(new deck.TileLayer({id:'basemap',
-      data:['https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-            'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-            'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'],
+      data:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       minZoom:0, maxZoom:19, tileSize:256,
       renderSubLayers: props => {
         const tb=props.tile.boundingBox, bx=props.tile.bbox;
