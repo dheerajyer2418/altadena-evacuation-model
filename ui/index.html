@@ -113,6 +113,14 @@
   #about table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12.5px}
   #about td,#about th{border:1px solid var(--edge);padding:6px 9px;text-align:left;vertical-align:top}
   #about th{color:var(--muted);font-weight:600}
+
+  /* ---- glow the Sources button so people notice it ---- */
+  @keyframes srcGlow{
+    0%,100%{box-shadow:0 0 0 0 rgba(255,210,74,0);border-color:var(--edge)}
+    50%{box-shadow:0 0 15px 2px rgba(255,210,74,.8);border-color:var(--accent2)}
+  }
+  #about-btn{animation:srcGlow 1.8s ease-in-out infinite;color:var(--accent2)}
+  #about-btn:hover,#about-btn.glow-off{animation:none;border-color:var(--accent);color:var(--text)}
 </style>
 </head>
 <body>
@@ -220,7 +228,7 @@
         safety before the fire reaches them.</p>
 
       <h3>Where did the information come from?</h3>
-      <p>I didn’t make up the town — I used <b>real public data</b>:</p>
+      <p>I used the data below:</p>
       <table>
         <tr><th>I used…</th><th>…which is</th><th>…to figure out</th></tr>
         <tr><td><b>U.S. Census data</b> (2019–2023)</td>
@@ -247,9 +255,8 @@
       <p class="mut">Note: the street map is today’s map, not the exact 2025 map.</p>
 
       <h3>How did I build a fake town that still feels real?</h3>
-      <p>I can’t get a list of every real resident (privacy!), so I build a
-        <b>stand-in population</b> instead. Think of it like casting extras for a
-        movie: I take real anonymous example households and copy/arrange them until
+      <p>SinceI can’t get a list of every real resident, I build a
+        <b>synthetic population</b> instead. I take real anonymous example households and copy/arrange them until
         the crowd matches the official neighborhood totals — the right number of
         kids, seniors, big families, one-car homes, no-car homes, and so on, in each
         neighborhood.</p>
@@ -262,8 +269,7 @@
           tables aren’t published for small neighborhoods, so I swapped in ones that
           are. I also found and fixed two spots where I’d lined up the Census
           columns wrong — after the fix, the fake town matched reality much better.</li>
-        <li><b>One honest wrinkle:</b> households with <b>no car</b> are exactly who
-          this study cares about, and they’re rare, so my stand-in slightly
+        <li><b>One honest wrinkle:</b> households with <b>no car</b> are rare, so my stand-in slightly
           overcounts them (about 4.5% vs. the real 3.7%). Close, but treat that exact
           number as “roughly right.”</li>
         <li><b>On purpose, I did NOT use race to guess behavior</b>, and I did
@@ -273,7 +279,7 @@
 
       <h3>How do traffic jams happen in the model?</h3>
       <p>Each road can only hold so many cars and can only let so many through per
-        minute — just like real life. When too many cars pile onto a road, a
+        minute and when too many cars pile onto a road, a
         <b>queue backs up</b> and spills onto the roads behind it. Nothing says
         “everyone instantly arrives”: the gridlock builds up on its own, which is the
         whole point. Speed limits come from the real map where they’re listed, and a
@@ -287,14 +293,13 @@
       <p>The fire starts in the foothills and spreads outward, pushed to the
         southwest like a wind-driven Santa-Ana fire. As it reaches a road, that road
         closes. Importantly, the <b>self-driving cars only get a forecast</b> of
-        where the fire is heading (with some error and a little advance warning) —
-        they can’t magically see the future.</p>
+        where the fire is heading (with some error and a little advance warning).</p>
       <div class="callout"><b>Why the fire moves at the speed it does:</b> I picked a
         speed that’s scary-fast but still leaves people a chance to get out. If I
         made it so fast that <i>everyone</i> gets trapped no matter what, there’d be
         nothing to compare between strategies. It’s an <b>illustrative setting you
         can change</b>, not a measured real-world fire speed.</div>
-      <p class="mut">“Exposed” here means the fire <i>reached someone’s spot</i> — a
+      <p class="mut">“Exposed” here means the fire <i>reached someone’s spot</i>, which is a
         danger signal, <b>not</b> an injury or death. The model doesn’t predict
         casualties. Cars caught on a closing road aren’t deleted; they’re stuck and
         try to find another way out.</p>
@@ -325,9 +330,9 @@
       <h3>What I’m confident about vs. what I’m not</h3>
       <table>
         <tr><th>Question</th><th>Answer</th></tr>
-        <tr><td>Does the software do what it claims (no cheating — people and cars
+        <tr><td>Does the software work accordingly (people and cars
           are counted correctly, cars don’t teleport, etc.)?</td>
-          <td><b style="color:var(--good)">Yes — 29 automated tests pass</b></td></tr>
+          <td><b style="color:var(--good)">Yes — all tests pass</b></td></tr>
         <tr><td>Does the fake population match real Altadena census numbers?</td>
           <td><b style="color:var(--good)">Yes — within ~1%</b></td></tr>
         <tr><td>Are the traffic speeds tuned to real Altadena traffic?</td>
@@ -335,8 +340,7 @@
         <tr><td>Has this been checked against a real evacuation?</td>
           <td class="mut"><b>No</b></td></tr>
       </table>
-      <p class="mut">Bottom line: it’s a solid, carefully-built sandbox for
-        <b>comparing strategies fairly</b> — not a crystal ball. Every setting lives
+      <p class="mut">Every setting lives
         in plain text files anyone can change, and the full write-ups are in the
         project’s README and notes.</p>
     </div>
@@ -634,6 +638,7 @@ const ABOUT_CSS=`
   @media print{body{background:#fff}.wrap{max-width:100%}}
 `;
 function openAbout(){
+  $('#about-btn').classList.add('glow-off');   // stop glowing once they've found it
   updateAboutNote();
   const body=$('#about .body').innerHTML;
   const doc='<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
