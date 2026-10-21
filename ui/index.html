@@ -201,151 +201,144 @@
     <div class="body">
       <div class="scenote" id="about-scenote">Loaded scenario details appear here.</div>
 
-      <div class="callout"><b>Read this first.</b> These are <b>hypothetical</b>
-        evacuation scenarios for research, <b>not</b> a reconstruction of the
-        January-2025 Eaton Fire and <b>not</b> a prediction. The traffic model is
-        <b>uncalibrated</b> and the hazard is invented, so the numbers are only
-        meaningful as a <b>relative comparison</b> between policies run on identical
-        inputs. Software is tested; outcomes are not externally validated.</div>
+      <div class="callout"><b>Please read this first.</b> This is a <b>“what-if”
+        experiment</b>, not a replay of the real January-2025 Eaton Fire, and
+        <b>not</b> a prediction of what would really happen. The fire here is made
+        up, and the traffic part hasn’t been checked against real traffic data. So
+        the numbers are only useful for <b>comparing the strategies to each other</b>
+        (since every strategy is tested on the exact same setup) — not as real
+        forecasts. The computer code has been tested for bugs; the real-world
+        accuracy has not.</div>
 
-      <h3>What this is</h3>
-      <p>An agent-based model of wildfire evacuation in <b>pre-January-2025
-        Altadena, CA</b> (research with Dr. Sarah Grajdura, UIC). It represents
-        people, households (the decision-makers), private vehicles, and an
-        autonomous-vehicle (AV) fleet on a <b>real road network</b>, and compares
-        four AV dispatch policies — with a focus on households without a car.</p>
+      <h3>What am I looking at?</h3>
+      <p>It’s a simulation (basically a detailed “SimCity”-style model) of people
+        trying to drive out of <b>Altadena, California</b> during a wildfire. It’s a
+        research project with Dr. Sarah Grajdura at UIC. The big question:
+        <b>if self-driving cars helped with the evacuation, how should they decide
+        who to pick up — and would that actually help the people who don’t own a
+        car?</b> Everybody in town is represented as a little dot that has to get to
+        safety before the fire reaches them.</p>
 
-      <h3>Data sources</h3>
+      <h3>Where did the information come from?</h3>
+      <p>I didn’t make up the town — I used <b>real public data</b>:</p>
       <table>
-        <tr><th>Source</th><th>What / geography</th><th>Used for</th></tr>
-        <tr><td><b>U.S. Census ACS</b> 5-year, 2019–2023</td>
-            <td>Block-group tables B01001 (age×sex), B02001 (race), B03003
-                (Hispanic), B25044 (vehicles), B11016 (household size), B19001
-                (income), for the 34 Altadena block groups</td>
-            <td>Population marginals (who lives here)</td></tr>
-        <tr><td><b>ACS PUMS</b> 2023</td>
-            <td>Donor households from the containing PUMAs (03724, 03725) — broader
-                than Altadena</td>
-            <td>Whole-household “donor” records for synthesis</td></tr>
-        <tr><td><b>TIGER/Line</b> 2023</td>
-            <td>Place + block-group polygons</td>
-            <td>Selecting the 34 Altadena block groups; placing homes inside them</td></tr>
-        <tr><td><b>OpenStreetMap</b> (via osmnx)</td>
-            <td>Drivable road network, Altadena + 3&nbsp;km buffer (3,766 nodes /
-                9,972 directed edges)</td>
-            <td>The routable road graph</td></tr>
-        <tr><td><b>INRIX</b></td>
-            <td class="mut">none supplied</td>
-            <td class="mut">documented importer interface only — <b>no</b> data
-                imported, nothing calibrated from it</td></tr>
+        <tr><th>I used…</th><th>…which is</th><th>…to figure out</th></tr>
+        <tr><td><b>U.S. Census data</b> (2019–2023)</td>
+            <td>Official counts of who lives in each Altadena neighborhood — ages,
+                household sizes, income, race, and <b>how many cars each household
+                has</b></td>
+            <td>How many people live where, and who has a car vs. who doesn’t</td></tr>
+        <tr><td><b>Census “sample households”</b></td>
+            <td>Real (anonymous) example households from the wider LA area</td>
+            <td>Building believable families (the right mix of ages, cars, etc.)</td></tr>
+        <tr><td><b>Official map boundaries</b> (Census TIGER)</td>
+            <td>The exact shape of Altadena and its neighborhoods</td>
+            <td>Knowing which neighborhoods count as “Altadena” and placing homes
+                inside them</td></tr>
+        <tr><td><b>OpenStreetMap</b></td>
+            <td>The real street map (the same kind of data behind many map apps) —
+                about 10,000 road segments</td>
+            <td>The actual roads cars drive on</td></tr>
+        <tr><td><b>INRIX</b> (traffic company data)</td>
+            <td class="mut">wasn’t given to me</td>
+            <td class="mut">I left a “plug” ready for it, but used <b>none</b> of it
+                — so nothing here is tuned to real traffic speeds</td></tr>
       </table>
-      <p class="mut">OSM is a <b>current</b> snapshot stamped at download time — it
-        is not the January-2025 network. Race and Hispanic ethnicity are kept as
-        <b>separate</b> attributes.</p>
+      <p class="mut">Note: the street map is today’s map, not the exact 2025 map.</p>
 
-      <h3>How the population was built</h3>
-      <p>Households are synthesized by <b>Iterative Proportional Updating (IPU)</b>:
-        real PUMS <i>donor households</i> are reweighted so that <b>both</b>
-        household marginals (vehicles, size, income) and person marginals (age×sex,
-        race, Hispanic) match each block group simultaneously. Because every
-        synthetic household is a real donor household, within-household structure
-        (who lives with whom, their ages, the car count) is inherited, not invented.</p>
-      <div class="callout good">Result: <b>~15,000 households / ~41,300 people</b>
-        across 34 block groups — within ~1% of ACS totals; mean per-block-group fit
-        error <b>SRMSE ≈ 0.06</b>. Fit error is reported per block group.</div>
+      <h3>How did I build a fake town that still feels real?</h3>
+      <p>I can’t get a list of every real resident (privacy!), so I build a
+        <b>stand-in population</b> instead. Think of it like casting extras for a
+        movie: I take real anonymous example households and copy/arrange them until
+        the crowd matches the official neighborhood totals — the right number of
+        kids, seniors, big families, one-car homes, no-car homes, and so on, in each
+        neighborhood.</p>
+      <div class="callout good">The result: about <b>15,000 households / 41,000
+        people</b> — and when I add it up it lands within about <b>1%</b> of the real
+        Census totals for Altadena. So the crowd is a close stand-in for the real
+        town.</div>
       <ul>
-        <li><b>Table-availability checks mattered:</b> B08201 (size×vehicles) and
-          B18101 (disability) are <b>null at block-group level</b>, so vehicles come
-          from <code>B25044</code> and size from <code>B11016</code>; <b>disability
-          is inherited from PUMS donors</b> (real DIS flags), not fitted.</li>
-        <li><b>Two ACS cell-mapping bugs were found &amp; fixed</b> during
-          verification (a female-age cell offset and an income-bracket index).</li>
-        <li><b>Known caveat:</b> synthesized carless rate <b>4.5%</b> vs ACS
-          <b>3.7%</b> — carless households are rare, so donor/small-count effects
-          slightly overstate them. Since they are the research focus, treat the
-          absolute carless count as approximate.</li>
-        <li><b>Not inferred from race</b>; <b>disability ≠ “cannot drive”</b>.
-          “Assistance need” is a separate, documented household flag. Group quarters
-          are excluded (a documented limitation).</li>
+        <li><b>I double-checked the data and caught my own mistakes.</b> Some Census
+          tables aren’t published for small neighborhoods, so I swapped in ones that
+          are. I also found and fixed two spots where I’d lined up the Census
+          columns wrong — after the fix, the fake town matched reality much better.</li>
+        <li><b>One honest wrinkle:</b> households with <b>no car</b> are exactly who
+          this study cares about, and they’re rare, so my stand-in slightly
+          overcounts them (about 4.5% vs. the real 3.7%). Close, but treat that exact
+          number as “roughly right.”</li>
+        <li><b>On purpose, I did NOT use race to guess behavior</b>, and I did
+          <b>not</b> assume someone with a disability can’t drive. “Needs assistance”
+          is tracked as its own separate thing.</li>
       </ul>
 
-      <h3>Road network &amp; traffic (how congestion is modeled)</h3>
-      <p>A custom <b>mesoscopic</b> traffic engine — <b>not</b> fixed travel times.
-        Every road link has finite storage, a discharge (outflow) capacity, FIFO
-        queues, and <b>downstream blocking (spillback)</b>, so congestion emerges on
-        its own. One-way restrictions and link lengths are preserved.</p>
+      <h3>How do traffic jams happen in the model?</h3>
+      <p>Each road can only hold so many cars and can only let so many through per
+        minute — just like real life. When too many cars pile onto a road, a
+        <b>queue backs up</b> and spills onto the roads behind it. Nothing says
+        “everyone instantly arrives”: the gridlock builds up on its own, which is the
+        whole point. Speed limits come from the real map where they’re listed, and a
+        sensible default where they’re not.</p>
+      <p class="mut">The road capacities are <b>standard textbook estimates, not
+        tuned to Altadena</b> (I had no local traffic data), and “safety” just means
+        reaching a freeway exit toward the 210 / Pasadena — a modeling choice, not a
+        real evacuation order.</p>
+
+      <h3>The fire</h3>
+      <p>The fire starts in the foothills and spreads outward, pushed to the
+        southwest like a wind-driven Santa-Ana fire. As it reaches a road, that road
+        closes. Importantly, the <b>self-driving cars only get a forecast</b> of
+        where the fire is heading (with some error and a little advance warning) —
+        they can’t magically see the future.</p>
+      <div class="callout"><b>Why the fire moves at the speed it does:</b> I picked a
+        speed that’s scary-fast but still leaves people a chance to get out. If I
+        made it so fast that <i>everyone</i> gets trapped no matter what, there’d be
+        nothing to compare between strategies. It’s an <b>illustrative setting you
+        can change</b>, not a measured real-world fire speed.</div>
+      <p class="mut">“Exposed” here means the fire <i>reached someone’s spot</i> — a
+        danger signal, <b>not</b> an injury or death. The model doesn’t predict
+        casualties. Cars caught on a closing road aren’t deleted; they’re stuck and
+        try to find another way out.</p>
+
+      <h3>How do people decide when to leave?</h3>
+      <p>Each household goes through realistic steps: they <b>notice</b> the fire,
+        <b>get ready</b>, (if they need a ride) <b>request one</b>, then
+        <b>leave</b> and <b>drive to safety</b> — each taking some time. The default
+        timings (roughly 15 minutes to notice, 20 to pack up) are
+        <b>reasonable placeholders</b> that Dr. Grajdura can swap out. I also
+        separate owning a phone from the phone network actually working.</p>
+
+      <h3>The four self-driving-car strategies I compare</h3>
+      <p>The fleet is an <b>exact number of cars</b> (e.g. 300). People without a car
+        request a ride; everyone else drives themselves. All four strategies use the
+        same basic rules so the only thing that changes is the strategy itself:</p>
       <ul>
-        <li><b>Speeds:</b> OSM <code>maxspeed</code> where tagged, otherwise a
-          road-class default — each edge records which (<i>provenance is auditable</i>).</li>
-        <li><b>Capacity:</b> 1,800 veh/hour/lane (a standard planning default) and a
-          jam density for storage. <b class="mut">These are assumptions, not
-          calibrated to Altadena</b> — no INRIX/count data were used.</li>
-        <li><b>Destinations:</b> southbound exits toward the I-210 / Pasadena — a
-          modeling choice, not an evacuation order. Origins that can’t reach an exit
-          are reported, never deleted.</li>
+        <li><b>Pull out</b> — stop picking people up once the fire gets close to the
+          service area.</li>
+        <li><b>Normal</b> — first-come, first-served, no special priority.</li>
+        <li><b>Help-the-vulnerable-first</b> — prioritize people with no car and
+          those who need assistance.</li>
+        <li><b>Smart (adaptive)</b> — prioritize the vulnerable <i>and</i> only
+          accept a ride if the car can realistically finish the whole trip before the
+          fire would cut it off, re-checking as things change.</li>
       </ul>
 
-      <h3>Fire hazard (how it was chosen)</h3>
-      <p>A reproducible, time-dependent <b>anisotropic front</b> spreading from a
-        foothill ignition, pushed south-west (Santa-Ana-style). Two layers are kept
-        <b>strictly separate</b>: the <i>ground truth</i> (what actually closes roads
-        and exposes people) and the <i>forecast</i> the AV controller is allowed to
-        see (with lead time + error). The controller never sees the future unless an
-        experiment explicitly grants perfect information.</p>
-      <div class="callout"><b>Front speed = 0.6 m/s</b> by default. This is an
-        <b>illustrative</b> choice, not a calibrated value: the paper describes a
-        fast, “dire” fire, but a front so fast it traps everyone regardless of policy
-        leaves nothing to compare. 0.6 m/s stays dire while preserving an evacuation
-        window so policy differences are visible. <b>Edit it in
-        <code>config/hazard.yaml</code>.</b></div>
-      <p class="mut">“Exposure” means the fire front reached a person’s location — a
-        hazard-<i>contact</i> indicator, <b>not</b> injury or death. No casualty model
-        is implied. Vehicles caught on a closing road are held and exposed (and
-        reroute if possible), never silently removed.</p>
-
-      <h3>Evacuation behavior</h3>
-      <p>Five separable stages per household: <b>awareness → preparation → (AV)
-        request → departure/pickup → arrival</b>. Default timings are generic
-        lognormal <b>placeholders</b> (e.g. ~15 min awareness, ~20 min prep) in
-        <code>config/behavior.yaml</code> — easily replaced. Camp-Fire (2018) survey
-        coefficients are included only as an <b>optional, disabled</b> transfer
-        scenario, clearly labeled and <b>not</b> treated as validated for Altadena.
-        Smartphone ownership is modeled separately from a working comms network.</p>
-
-      <h3>AV fleet &amp; the four policies</h3>
-      <p>Fleet size is an <b>explicit number of vehicles</b> (not “market
-        penetration”). Carless households (and those with explicit assistance needs)
-        request AVs; everyone else drives. Common dispatch rules are identical across
-        policies so a comparison isolates the policy:</p>
-      <ul>
-        <li><b>Withdrawal</b> — stop accepting new pickups once the forecast front
-          nears the service area.</li>
-        <li><b>Normal</b> — first-come, first-served, no vulnerability priority.</li>
-        <li><b>Evacuation priority</b> — serve carless + assistance-need first.</li>
-        <li><b>Adaptive geofencing</b> — priority <i>plus</i> forecast screening:
-          accept a trip only if pickup + boarding + travel can finish before the
-          forecast fire reaches any point on the route; accepted trips are
-          reassessed as conditions change.</li>
-      </ul>
-
-      <h3>What was verified vs. not</h3>
+      <h3>What I’m confident about vs. what I’m not</h3>
       <table>
-        <tr><th>Claim</th><th>Status</th></tr>
-        <tr><td>Software correctness (conservation, seat limits, no duplicate
-          pickups, queues/spillback, forecast boundary, reproducibility…)</td>
-          <td><b style="color:var(--good)">✓ 29 automated tests pass</b></td></tr>
-        <tr><td>Population fit to real Altadena ACS</td>
-          <td><b style="color:var(--good)">✓ measured</b> (SRMSE ≈ 0.06)</td></tr>
-        <tr><td>Traffic calibration (speeds/capacities vs observations)</td>
-          <td class="mut"><b>✗ none</b> (default capacities; no INRIX)</td></tr>
-        <tr><td>External validation (vs a real evacuation)</td>
-          <td class="mut"><b>✗ none</b></td></tr>
+        <tr><th>Question</th><th>Answer</th></tr>
+        <tr><td>Does the software do what it claims (no cheating — people and cars
+          are counted correctly, cars don’t teleport, etc.)?</td>
+          <td><b style="color:var(--good)">Yes — 29 automated tests pass</b></td></tr>
+        <tr><td>Does the fake population match real Altadena census numbers?</td>
+          <td><b style="color:var(--good)">Yes — within ~1%</b></td></tr>
+        <tr><td>Are the traffic speeds tuned to real Altadena traffic?</td>
+          <td class="mut"><b>No</b> — standard defaults, no local data</td></tr>
+        <tr><td>Has this been checked against a real evacuation?</td>
+          <td class="mut"><b>No</b></td></tr>
       </table>
-      <p class="mut">Experiments use a fixed shared population and separate,
-        reproducible random streams for behavior, dispatch, and forecast error, so
-        policies are compared on identical inputs across seeds. Full repo docs:
-        <code>README.md</code>, <code>DATA_MANIFEST.md</code>,
-        <code>VALIDATION_REPORT.md</code>, <code>docs/ASSUMPTIONS.md</code>.</p>
+      <p class="mut">Bottom line: it’s a solid, carefully-built sandbox for
+        <b>comparing strategies fairly</b> — not a crystal ball. Every setting lives
+        in plain text files anyone can change, and the full write-ups are in the
+        project’s README and notes.</p>
     </div>
   </div>
 </div>
