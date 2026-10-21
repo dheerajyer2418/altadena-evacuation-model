@@ -1,5 +1,19 @@
 # Altadena Wildfire Evacuation ABM
 
+### ▶ Live interactive viewer: **https://dheerajyer2418.github.io/altadena-evacuation-model/**
+
+Open the link to watch the evacuation play out on a map of Altadena — pick a
+scenario, press play, and see the fire spread, cars move, and the live outcome
+counters (including a dedicated carless-households panel). The **? Tour** button
+gives a 60-second walkthrough, **ⓘ Sources** opens a plain-language methodology
+write-up, and **📊 Results** shows the comparison table, charts, and data
+downloads. Nothing to install — it runs in any modern browser.
+
+> *Results shown are hypothetical, uncalibrated scenarios for **relative**
+> policy comparison — not predictions. See `VALIDATION_REPORT.md`.*
+
+---
+
 An agent-based model of wildfire evacuation in **pre-January-2025 Altadena, California**,
 built on a U.S. Census–based synthetic population and a real OpenStreetMap road network,
 with a mesoscopic traffic engine (finite road storage, discharge capacity, queues, and
