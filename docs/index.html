@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Altadena Evacuation — Mission Control</title>
+<script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#121823; --panel2:#0e141d; --edge:#1e2a3a;
+    --accent:#46e0c0; --accent2:#ffd24a; --fire:#ff5a3c; --carless:#ff5277;
+    --text:#d8e2ee; --muted:#7d8ea3; --good:#46e07a; --blue:#4aa3ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:"Segoe UI",Inter,system-ui,sans-serif;overflow:hidden}
+  #app{display:grid;height:100vh;
+    grid-template-columns:270px 1fr 300px;
+    grid-template-rows:54px 1fr 92px;
+    grid-template-areas:"hdr hdr hdr" "left center right" "left foot right";gap:8px;padding:8px}
+  .panel{background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--edge);border-radius:10px;box-shadow:0 2px 14px #0008}
+  #hdr{grid-area:hdr;display:flex;align-items:center;gap:14px;padding:0 16px}
+  #hdr h1{font-size:16px;margin:0;letter-spacing:.5px;font-weight:600}
+  #hdr .tag{font-size:11px;color:var(--muted);border:1px solid var(--edge);
+    padding:2px 8px;border-radius:20px}
+  #hdr .live{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  #clock{font-variant-numeric:tabular-nums;color:var(--accent);font-size:15px;font-weight:600}
+  #left{grid-area:left;padding:12px;overflow:auto}
+  #right{grid-area:right;padding:12px;overflow:auto}
+  #center{grid-area:center;position:relative;overflow:hidden;padding:0}
+  #deck{position:absolute;inset:0;border-radius:10px}
+  #foot{grid-area:foot;padding:10px 16px;display:flex;flex-direction:column;gap:8px}
+  h2.sec{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);
+    margin:4px 0 8px;border-bottom:1px solid var(--edge);padding-bottom:5px}
+  button{font-family:inherit;color:var(--text);background:#17202e;border:1px solid var(--edge);
+    border-radius:7px;padding:8px 10px;cursor:pointer;font-size:13px;transition:.12s;width:100%}
+  button:hover{border-color:var(--accent);background:#1b2636}
+  button.active{border-color:var(--accent);background:#163b36;color:#fff}
+  .scen-btn{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;text-align:left}
+  .scen-btn small{color:var(--muted);font-size:11px}
+  .ctl{display:flex;align-items:center;gap:8px;margin:8px 0}
+  .ctl label{font-size:12px;color:var(--muted);width:54px}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .transport{display:flex;gap:6px}
+  .transport button{font-size:16px;padding:6px}
+  .stat{display:flex;justify-content:space-between;align-items:baseline;margin:7px 0}
+  .stat .k{font-size:12px;color:var(--muted)}
+  .stat .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+  .big{font-size:30px}
+  .bar{height:8px;background:#1b2636;border-radius:5px;overflow:hidden;margin-top:3px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--good),var(--accent))}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  #tl{display:flex;align-items:center;gap:10px}
+  #tl input{flex:1}
+  .note{font-size:10px;color:var(--muted);line-height:1.4}
+  #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:14px;background:#0a0e14cc;z-index:5}
+  .pill{font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid var(--edge);color:var(--muted)}
+
+  /* ---- guided tour ---- */
+  #tour-blocker{position:fixed;inset:0;z-index:40;display:none;cursor:default}
+  #tour-box{position:fixed;z-index:41;border-radius:10px;pointer-events:none;
+    border:2px solid var(--accent);box-shadow:0 0 0 9999px rgba(5,8,13,.78),0 0 22px #46e0c0aa;
+    transition:all .32s cubic-bezier(.4,.1,.2,1);display:none}
+  #tour-pop{position:fixed;z-index:42;max-width:320px;background:linear-gradient(180deg,#16202e,#0f1824);
+    border:1px solid var(--accent);border-radius:12px;padding:16px 16px 12px;display:none;
+    box-shadow:0 10px 40px #000a;transition:all .28s ease}
+  #tour-pop h3{margin:0 0 7px;font-size:15px;color:#fff}
+  #tour-pop p{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text)}
+  #tour-pop .row{display:flex;align-items:center;gap:8px}
+  #tour-pop .prog{font-size:11px;color:var(--muted);margin-right:auto}
+  #tour-pop button{width:auto;padding:6px 14px;font-size:13px}
+  #tour-pop button.primary{border-color:var(--accent);background:#163b36;color:#fff}
+  #tour-pop .end{position:absolute;top:8px;right:10px;width:auto;padding:2px 8px;
+    background:transparent;border:none;color:var(--muted);font-size:16px}
+  #tour-pop .end:hover{color:#fff}
+  /* first-load prompt */
+  #tour-prompt{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+    background:rgba(5,8,13,.72);backdrop-filter:blur(2px)}
+  #tour-prompt .card{background:linear-gradient(180deg,#16202e,#0f1824);border:1px solid var(--accent);
+    border-radius:14px;padding:26px 28px;max-width:420px;text-align:center;box-shadow:0 20px 60px #000b}
+  #tour-prompt h2{margin:0 0 8px;font-size:20px;color:#fff;letter-spacing:.3px}
+  #tour-prompt p{margin:0 0 18px;color:var(--muted);font-size:13px;line-height:1.5}
+  #tour-prompt .row{display:flex;gap:10px;justify-content:center}
+  #tour-prompt button{width:auto;padding:10px 20px;font-size:14px}
+
+  /* ---- sources & methods modal ---- */
+  #about{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(5,8,13,.72);backdrop-filter:blur(3px)}
+  #about .card{background:linear-gradient(180deg,#141d29,#0d151f);border:1px solid var(--edge);
+    border-radius:14px;width:min(820px,92vw);max-height:88vh;overflow:auto;
+    box-shadow:0 24px 70px #000c;position:relative}
+  #about .card>header{position:sticky;top:0;background:#111a26;border-bottom:1px solid var(--edge);
+    padding:16px 22px;display:flex;align-items:center;gap:12px;z-index:1}
+  #about h2{margin:0;font-size:18px;color:#fff;letter-spacing:.3px}
+  #about .close{margin-left:auto;width:auto;padding:4px 12px;font-size:16px}
+  #about .body{padding:8px 24px 26px}
+  #about h3{font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--accent);
+    margin:20px 0 6px;border-bottom:1px solid var(--edge);padding-bottom:5px}
+  #about p,#about li{font-size:13px;line-height:1.6;color:var(--text)}
+  #about ul{margin:6px 0;padding-left:18px}
+  #about b{color:#fff}
+  #about .mut{color:var(--muted)}
+  #about code{background:#0c131d;border:1px solid var(--edge);border-radius:4px;padding:1px 5px;font-size:12px}
+  #about .callout{border:1px solid #ffd24a55;background:#2a2410;border-radius:9px;
+    padding:12px 14px;margin:12px 0;font-size:12.5px;line-height:1.55}
+  #about .callout.good{border-color:#46e07a55;background:#102517}
+  #about .scenote{border:1px solid var(--edge);background:#0e1620;border-radius:9px;
+    padding:10px 14px;margin:4px 0 10px;font-size:12.5px;color:var(--muted)}
+  #about table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12.5px}
+  #about td,#about th{border:1px solid var(--edge);padding:6px 9px;text-align:left;vertical-align:top}
+  #about th{color:var(--muted);font-weight:600}
+
+  /* ---- glow the Sources button so people notice it ---- */
+  @keyframes srcGlow{
+    0%,100%{box-shadow:0 0 0 0 rgba(255,210,74,0);border-color:var(--edge)}
+    50%{box-shadow:0 0 15px 2px rgba(255,210,74,.8);border-color:var(--accent2)}
+  }
+  #about-btn{animation:srcGlow 1.8s ease-in-out infinite;color:var(--accent2)}
+  #about-btn:hover,#about-btn.glow-off{animation:none;border-color:var(--accent);color:var(--text)}
+
+  /* ---- results panel ---- */
+  #results{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(5,8,13,.72);backdrop-filter:blur(3px)}
+  #results .card{background:linear-gradient(180deg,#141d29,#0d151f);border:1px solid var(--edge);
+    border-radius:14px;width:min(960px,95vw);max-height:90vh;overflow:auto;box-shadow:0 24px 70px #000c}
+  #results header{position:sticky;top:0;background:#111a26;border-bottom:1px solid var(--edge);
+    padding:14px 20px;display:flex;align-items:center;gap:10px;z-index:1}
+  #results h2{margin:0;font-size:17px;color:#fff}
+  #results header .sp{margin-left:auto}
+  #results header button{width:auto;padding:7px 14px;font-size:13px}
+  #results header button.dl{border-color:var(--accent);background:#163b36;color:#fff;margin-left:6px}
+  #results .body{padding:14px 20px 22px}
+  #results table{width:100%;border-collapse:collapse;font-size:13px}
+  #results th,#results td{border:1px solid var(--edge);padding:8px 10px;text-align:right;white-space:nowrap}
+  #results th:first-child,#results td:first-child{text-align:left;white-space:normal;min-width:180px}
+  #results th{background:#17202e;color:var(--muted);position:sticky;top:52px}
+  #results tr:hover td{background:#131c28}
+  #results .pop{font-size:11px;color:var(--muted)}
+  #results .good{color:var(--good);font-weight:700}
+  #results .warn{color:var(--carless);font-weight:700}
+  #results .cap{font-size:11px;color:var(--muted);margin:10px 2px 0;line-height:1.5}
+  #results .rc-h{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);
+    margin:20px 0 8px;border-bottom:1px solid var(--edge);padding-bottom:5px}
+  #results-charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  #results-charts figure{margin:0;background:#0d151f;border:1px solid var(--edge);border-radius:9px;padding:8px}
+  #results-charts img{width:100%;height:auto;display:block;border-radius:6px;background:#fff;cursor:zoom-in}
+  #results-charts figcaption{font-size:11px;color:var(--muted);margin-top:6px;text-align:center}
+  @media(max-width:720px){#results-charts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hdr" class="panel">
+    <h1>ALTADENA EVACUATION</h1>
+    <span class="tag" id="src-tag">loading…</span>
+    <span class="tag" id="mode-tag"></span>
+    <div class="live"><span id="play-state">● PAUSED</span>
+      <span>T+</span><span id="clock">00:00</span>
+      <button id="results-btn" title="View & download results for all scenarios" style="width:auto;padding:5px 12px;margin-left:6px">📊 Results</button>
+      <button id="about-btn" title="Sources & methodology" style="width:auto;padding:5px 12px;margin-left:6px">ⓘ Sources</button>
+      <button id="tour-btn" title="Guided tour" style="width:auto;padding:5px 12px;margin-left:6px">? Tour</button></div>
+  </div>
+
+  <div id="left" class="panel">
+    <h2 class="sec">Scenario</h2>
+    <div id="scenarios"><div class="note">No replays found. Generate one:<br>
+      <code>python -m scripts.export_replay --mode altadena --fleet 0</code></div></div>
+
+    <h2 class="sec" style="margin-top:16px">Playback</h2>
+    <div class="transport">
+      <button id="btn-restart" title="Restart">⟲</button>
+      <button id="btn-play" title="Play/Pause">▶</button>
+      <button id="btn-end" title="Jump to end">⇥</button>
+    </div>
+    <div class="ctl" id="ctl-speed"><label>Speed</label>
+      <input id="speed" type="range" min="1" max="120" value="40"/>
+      <span id="speed-v" class="pill">40×</span></div>
+
+    <h2 class="sec" style="margin-top:16px">Layers</h2>
+    <div id="grp-layers">
+      <div class="ctl"><label>Map</label><input id="ly-map" type="checkbox" checked></div>
+      <div class="ctl"><label>Roads</label><input id="ly-roads" type="checkbox"></div>
+      <div class="ctl"><label>Homes</label><input id="ly-origins" type="checkbox" checked></div>
+      <div class="ctl"><label>Fire</label><input id="ly-fire" type="checkbox" checked></div>
+      <div class="ctl"><label>Vehicles</label><input id="ly-veh" type="checkbox" checked></div>
+      <div class="ctl"><label>Spin</label><input id="ly-spin" type="checkbox"></div>
+    </div>
+  </div>
+
+  <div id="center" class="panel">
+    <div id="deck"></div>
+    <div id="loading">initializing 3-D map…</div>
+  </div>
+
+  <div id="right" class="panel">
+    <h2 class="sec">Live outcomes</h2>
+    <div class="stat"><span class="k">Reached safety</span><span class="v big" id="s-reached" style="color:var(--good)">—</span></div>
+    <div class="bar"><i id="s-reached-bar" style="width:0%"></i></div>
+    <div class="stat"><span class="k">Still in transit / waiting</span><span class="v" id="s-transit">—</span></div>
+    <div class="stat"><span class="k">Exposed to fire</span><span class="v" id="s-exposed" style="color:var(--fire)">—</span></div>
+    <div class="stat"><span class="k">Trapped vehicles</span><span class="v" id="s-trapped">—</span></div>
+
+    <h2 class="sec" style="margin-top:16px">Carless households <span class="pill">focus</span></h2>
+    <div class="stat"><span class="k">Carless reached</span><span class="v big" id="s-carless" style="color:var(--carless)">—</span></div>
+    <div class="bar"><i id="s-carless-bar" style="width:0%;background:linear-gradient(90deg,#ff5277,#ffd24a)"></i></div>
+    <div class="stat"><span class="k">Carless present</span><span class="v" id="s-carless-n">—</span></div>
+    <div class="stat"><span class="k">AVs in service</span><span class="v" id="s-av">—</span></div>
+
+    <h2 class="sec" style="margin-top:16px">Network</h2>
+    <div class="stat"><span class="k">Roads closed by fire</span><span class="v" id="s-closed">—</span></div>
+  </div>
+
+  <div id="foot" class="panel">
+    <div id="tl">
+      <span class="pill" id="tl-t">T+00:00</span>
+      <input id="scrub" type="range" min="0" max="100" value="0"/>
+      <span class="pill" id="tl-end">—</span>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:#4aa3ff"></i>private vehicle</span>
+      <span><i class="dot" style="background:#ffd24a"></i>AV (empty)</span>
+      <span><i class="dot" style="background:#46e07a"></i>AV (carrying)</span>
+      <span><i class="dot" style="background:#ff5277"></i>carless home</span>
+      <span><i class="dot" style="background:#ff5a3c"></i>fire front</span>
+      <span><i class="dot" style="background:#46e0c0"></i>safety exit</span>
+      <span class="note" id="foot-note"></span>
+    </div>
+  </div>
+</div>
+
+<!-- results panel -->
+<div id="results">
+  <div class="card">
+    <header><h2>Results — all scenarios</h2>
+      <span class="sp"></span>
+      <button class="dl" id="results-csv" title="Download a spreadsheet (CSV)">⬇ Download CSV</button>
+      <button id="results-json" title="Download raw JSON">⬇ JSON</button>
+      <button id="results-close" title="Close">✕</button></header>
+    <div class="body">
+      <div id="results-table">loading…</div>
+      <h3 class="rc-h">Charts</h3>
+      <div id="results-charts"></div>
+      <p class="cap">“Reached” = share of people present who got to safety · “Carless”
+        = same for households with no car (the study’s focus) · “Exposed” = people the
+        fire front reached (a danger signal, not a casualty count). These are
+        hypothetical, uncalibrated scenarios — compare them to each other, not as
+        predictions. CSV opens directly in Excel.</p>
+    </div>
+  </div>
+</div>
+
+<!-- sources & methodology modal -->
+<div id="about">
+  <div class="card">
+    <header><h2>Sources &amp; Methodology</h2>
+      <button class="close" id="about-close" title="Close">✕</button></header>
+    <div class="body">
+      <div class="scenote" id="about-scenote">Loaded scenario details appear here.</div>
+
+      <div class="callout"><b>Please read this first.</b> This is a <b>“what-if”
+        experiment</b>, not a replay of the real January-2025 Eaton Fire, and
+        <b>not</b> a prediction of what would really happen. The fire here is made
+        up, and the traffic part hasn’t been checked against real traffic data. So
+        the numbers are only useful for <b>comparing the strategies to each other</b>
+        (since every strategy is tested on the exact same setup) — not as real
+        forecasts. The computer code has been tested for bugs; the real-world
+        accuracy has not.</div>
+
+      <h3>What am I looking at?</h3>
+      <p>It’s a simulation (basically a detailed “SimCity”-style model) of people
+        trying to drive out of <b>Altadena, California</b> during a wildfire. The
+        big question:
+        <b>if self-driving cars helped with the evacuation, how should they decide
+        who to pick up — and would that actually help the people who don’t own a
+        car?</b> Everybody in town is represented as a little dot that has to get to
+        safety before the fire reaches them.</p>
+
+      <h3>Where did the information come from?</h3>
+      <p>I used the data below:</p>
+      <table>
+        <tr><th>I used…</th><th>…which is</th><th>…to figure out</th></tr>
+        <tr><td><b>U.S. Census data</b> (2019–2023)</td>
+            <td>Official counts of who lives in each Altadena neighborhood — ages,
+                household sizes, income, race, and <b>how many cars each household
+                has</b></td>
+            <td>How many people live where, and who has a car vs. who doesn’t</td></tr>
+        <tr><td><b>Census “sample households”</b></td>
+            <td>Real (anonymous) example households from the wider LA area</td>
+            <td>Building believable families (the right mix of ages, cars, etc.)</td></tr>
+        <tr><td><b>Official map boundaries</b> (Census TIGER)</td>
+            <td>The exact shape of Altadena and its neighborhoods</td>
+            <td>Knowing which neighborhoods count as “Altadena” and placing homes
+                inside them</td></tr>
+        <tr><td><b>OpenStreetMap</b></td>
+            <td>The real street map (the same kind of data behind many map apps) —
+                about 10,000 road segments</td>
+            <td>The actual roads cars drive on</td></tr>
+        <tr><td><b>INRIX</b> (traffic company data)</td>
+            <td class="mut">wasn’t given to me</td>
+            <td class="mut">I left a “plug” ready for it, but used <b>none</b> of it
+                — so nothing here is tuned to real traffic speeds</td></tr>
+      </table>
+      <p class="mut">Note: the street map is today’s map, not the exact 2025 map.</p>
+
+      <h3>How did I build a fake town that still feels real?</h3>
+      <p>SinceI can’t get a list of every real resident, I build a
+        <b>synthetic population</b> instead. I take real anonymous example households and copy/arrange them until
+        the crowd matches the official neighborhood totals — the right number of
+        kids, seniors, big families, one-car homes, no-car homes, and so on, in each
+        neighborhood.</p>
+      <div class="callout good">The result: about <b>15,000 households / 41,000
+        people</b> — and when I add it up it lands within about <b>1%</b> of the real
+        Census totals for Altadena. So the crowd is a close stand-in for the real
+        town.</div>
+      <ul>
+        <li><b>I double-checked the data and caught my own mistakes.</b> Some Census
+          tables aren’t published for small neighborhoods, so I swapped in ones that
+          are. I also found and fixed two spots where I’d lined up the Census
+          columns wrong — after the fix, the fake town matched reality much better.</li>
+        <li><b>One honest wrinkle:</b> households with <b>no car</b> are rare, so my stand-in slightly
+          overcounts them (about 4.5% vs. the real 3.7%). Close, but treat that exact
+          number as “roughly right.”</li>
+        <li><b>On purpose, I did NOT use race to guess behavior</b>, and I did
+          <b>not</b> assume someone with a disability can’t drive. “Needs assistance”
+          is tracked as its own separate thing.</li>
+      </ul>
+
+      <h3>How do traffic jams happen in the model?</h3>
+      <p>Each road can only hold so many cars and can only let so many through per
+        minute and when too many cars pile onto a road, a
+        <b>queue backs up</b> and spills onto the roads behind it. Nothing says
+        “everyone instantly arrives”: the gridlock builds up on its own, which is the
+        whole point. Speed limits come from the real map where they’re listed, and a
+        sensible default where they’re not.</p>
+      <p class="mut">The road capacities are <b>standard textbook estimates, not
+        tuned to Altadena</b> (I had no local traffic data), and “safety” just means
+        reaching a freeway exit toward the 210 / Pasadena — a modeling choice, not a
+        real evacuation order.</p>
+
+      <h3>The fire</h3>
+      <p>The fire starts in the foothills and spreads outward, pushed to the
+        southwest like a wind-driven Santa-Ana fire. As it reaches a road, that road
+        closes. Importantly, the <b>self-driving cars only get a forecast</b> of
+        where the fire is heading (with some error and a little advance warning).</p>
+      <div class="callout"><b>Why the fire moves at the speed it does:</b> I picked a
+        speed that’s scary-fast but still leaves people a chance to get out. If I
+        made it so fast that <i>everyone</i> gets trapped no matter what, there’d be
+        nothing to compare between strategies. It’s an <b>illustrative setting you
+        can change</b>, not a measured real-world fire speed.</div>
+      <p class="mut">“Exposed” here means the fire <i>reached someone’s spot</i>, which is a
+        danger signal, <b>not</b> an injury or death. The model doesn’t predict
+        casualties. Cars caught on a closing road aren’t deleted; they’re stuck and
+        try to find another way out.</p>
+
+      <h3>How do people decide when to leave?</h3>
+      <p>Each household goes through realistic steps: they <b>notice</b> the fire,
+        <b>get ready</b>, (if they need a ride) <b>request one</b>, then
+        <b>leave</b> and <b>drive to safety</b> — each taking some time. The default
+        timings (roughly 15 minutes to notice, 20 to pack up) are
+        <b>reasonable placeholders</b> that can easily be changed. I also
+        separate owning a phone from the phone network actually working.</p>
+
+      <h3>The four self-driving-car strategies I compare</h3>
+      <p>The fleet is an <b>exact number of cars</b> (e.g. 300). People without a car
+        request a ride; everyone else drives themselves. All four strategies use the
+        same basic rules so the only thing that changes is the strategy itself:</p>
+      <ul>
+        <li><b>Pull out</b> — stop picking people up once the fire gets close to the
+          service area.</li>
+        <li><b>Normal</b> — first-come, first-served, no special priority.</li>
+        <li><b>Help-the-vulnerable-first</b> — prioritize people with no car and
+          those who need assistance.</li>
+        <li><b>Smart (adaptive)</b> — prioritize the vulnerable <i>and</i> only
+          accept a ride if the car can realistically finish the whole trip before the
+          fire would cut it off, re-checking as things change.</li>
+      </ul>
+
+      <h3>What I’m confident about vs. what I’m not</h3>
+      <table>
+        <tr><th>Question</th><th>Answer</th></tr>
+        <tr><td>Does the software work accordingly (people and cars
+          are counted correctly, cars don’t teleport, etc.)?</td>
+          <td><b style="color:var(--good)">Yes — all tests pass</b></td></tr>
+        <tr><td>Does the fake population match real Altadena census numbers?</td>
+          <td><b style="color:var(--good)">Yes — within ~1%</b></td></tr>
+        <tr><td>Are the traffic speeds tuned to real Altadena traffic?</td>
+          <td class="mut"><b>No</b> — standard defaults, no local data</td></tr>
+        <tr><td>Has this been checked against a real evacuation?</td>
+          <td class="mut"><b>No</b></td></tr>
+      </table>
+      <p class="mut">Every setting lives
+        in plain text files anyone can change, and the full write-ups are in the
+        project’s README and notes.</p>
+    </div>
+  </div>
+</div>
+
+<!-- guided tour overlay -->
+<div id="tour-blocker"></div>
+<div id="tour-box"></div>
+<div id="tour-pop">
+  <button class="end" id="tour-end" title="End tour">✕</button>
+  <h3 id="tour-title"></h3>
+  <p id="tour-text"></p>
+  <div class="row">
+    <span class="prog" id="tour-prog"></span>
+    <button id="tour-back">Back</button>
+    <button id="tour-next" class="primary">Next</button>
+  </div>
+</div>
+<div id="tour-prompt">
+  <div class="card">
+    <h2>Welcome to Altadena Evacuation</h2>
+    <p>This is a live simulation viewer. Want a 60-second guided tour of how to
+       use it? You can stop any time, and relaunch it later with the “? Tour”
+       button up top.</p>
+    <div class="row">
+      <button id="tour-yes" class="primary">Yes, show me around</button>
+      <button id="tour-no">No thanks</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmtT = s => { s=Math.max(0,Math.round(s)); const m=Math.floor(s/60),ss=s%60;
+  return String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0'); };
+
+let deckgl=null, replay=null, frames=[], playing=false, speed=40, t=0, horizon=0;
+let layersState={map:true,roads:true,origins:true,fire:true,veh:true,spin:false};
+let lastRAF=null, vs=null, INDEX={};
+
+async function loadIndex(){
+  try{
+    // Standalone mode: data embedded by export_standalone.py (works via file://).
+    const idx = window.__INDEX__ ||
+      await (await fetch('./index.json?_='+Date.now())).json();
+    INDEX = idx;
+    const box = $('#scenarios'); box.innerHTML='';
+    const items = Object.values(idx);
+    if(!items.length){ box.innerHTML='<div class="note">No replays yet. Run <code>export_replay</code>.</div>'; return; }
+    items.forEach((it,i)=>{
+      const b=document.createElement('button'); b.className='scen-btn';
+      const rf=it.reached_frac!=null?Math.round(it.reached_frac*100)+'%':'—';
+      const cf=it.carless_reached_frac!=null?Math.round(it.carless_reached_frac*100)+'%':'—';
+      b.innerHTML=`<span>${it.label}</span><small>reached ${rf} · carless ${cf}</small>`;
+      b.onclick=()=>{document.querySelectorAll('.scen-btn').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active'); loadReplay(it.file);};
+      box.appendChild(b);
+      if(i===0){ b.classList.add('active'); loadReplay(it.file); }
+    });
+  }catch(e){ console.error(e);
+    $('#scenarios').innerHTML='<div class="note">Could not read index.json.<br>Start the server: <code>python -m scripts.serve_ui</code></div>'; }
+}
+
+async function loadReplay(file){
+  $('#loading').style.display='flex'; $('#loading').textContent='loading '+file+' …';
+  try{
+    replay = (window.__REPLAYS__ && window.__REPLAYS__[file]) ||
+      await (await fetch('./'+file+'?_='+Date.now())).json();
+    frames = replay.frames||[];
+    horizon = replay.meta?.horizon_s || (frames.length?frames[frames.length-1].t:0);
+    $('#scrub').max = horizon; $('#tl-end').textContent='T+'+fmtT(horizon);
+    $('#src-tag').textContent = replay.meta?.note?.slice(0,42) || '';
+    $('#mode-tag').textContent = (replay.meta?.mode||'')+' · '+(replay.meta?.policy||'');
+    $('#foot-note').textContent = replay.meta?.note || '';
+    // The toy demo is a synthetic grid, not real geography — hide the street map
+    // for it (and show the road overlay so the grid is visible instead).
+    const isToy = (replay.meta?.mode === 'toy');
+    layersState.map = !isToy;      // street map only for real geography
+    layersState.roads = true;      // modeled road network on for every scenario
+    $('#ly-map').checked = layersState.map;
+    $('#ly-roads').checked = layersState.roads;
+    t=0; initDeck(); setTime(0); play(false); startLoop();
+    $('#loading').style.display='none';
+  }catch(e){ console.error(e); $('#loading').textContent='failed to load '+file; }
+}
+
+function initViewState(){
+  const b=replay.bounds;
+  return {longitude:b.clon, latitude:b.clat, zoom:12.4, pitch:52, bearing:0};
+}
+
+// anisotropic fire front polygon at time tt (same formula as the Python hazard)
+function firePolygon(tt){
+  const h=replay.hazard; if(!h||h.model!=='radial_front') return [];
+  const dt=tt-(h.detection_s||0); if(dt<=0) return [];
+  const bias=h.dir_bias_deg*Math.PI/180, aniso=h.anisotropy||1, base=h.speed_mps;
+  const ring=[]; const coslat=Math.cos(h.ig_lat*Math.PI/180);
+  for(let i=0;i<=72;i++){
+    const brg=i/72*2*Math.PI;               // 0=north, clockwise
+    const align=Math.cos(brg-bias);
+    const factor=1+(aniso-1)*(align+1)/2;
+    const r=base*Math.max(factor,0.15)*dt;   // meters
+    const north=r*Math.cos(brg), east=r*Math.sin(brg);
+    const lon=h.ig_lon + (east/6371000)*180/Math.PI/coslat;
+    const lat=h.ig_lat + (north/6371000)*180/Math.PI;
+    ring.push([lon,lat]);
+  }
+  return [ring];
+}
+
+function nearestFrame(tt){
+  if(!frames.length) return null;
+  let lo=0,hi=frames.length-1,ans=0;
+  while(lo<=hi){const m=(lo+hi)>>1; if(frames[m].t<=tt){ans=m;lo=m+1;}else hi=m-1;}
+  return frames[ans];
+}
+
+const KIND_COLOR={1:[74,163,255],2:[255,210,74],3:[70,224,122]};
+function buildLayers(){
+  const L=[]; const fr=nearestFrame(t);
+  // Street basemap — OpenStreetMap tiles (no API key), rendered as light
+  // grayscale ("toner-lite" look) via BitmapLayer's built-in desaturate.
+  if(layersState.map)
+    L.push(new deck.TileLayer({id:'basemap',
+      data:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      minZoom:0, maxZoom:19, tileSize:256,
+      renderSubLayers: props => {
+        const tb=props.tile.boundingBox, bx=props.tile.bbox;
+        const bounds = tb ? [tb[0][0],tb[0][1],tb[1][0],tb[1][1]]
+                          : [bx.west,bx.south,bx.east,bx.north];
+        return new deck.BitmapLayer(props,{data:null,image:props.data,bounds,
+          desaturate:1, opacity:0.78});   // grayscale + slightly faded = toner-lite
+      }}));
+  if(layersState.roads && replay.roads)
+    L.push(new deck.PathLayer({id:'roads',data:replay.roads,getPath:d=>d,
+      getColor:layersState.map?[20,80,160,150]:[70,90,120,120],getWidth:2,widthUnits:'pixels'}));
+  if(layersState.origins && replay.origins)
+    L.push(new deck.ScatterplotLayer({id:'homes',data:replay.origins,
+      getPosition:d=>[d[0],d[1]],getFillColor:d=>d[2]?[255,82,119,180]:[90,110,140,90],
+      getRadius:d=>d[2]?18:10,radiusUnits:'meters',radiusMinPixels:1.5,radiusMaxPixels:4}));
+  if(layersState.fire && replay.hazard){
+    const poly=firePolygon(t);
+    if(poly.length) L.push(new deck.PolygonLayer({id:'fire',data:poly,
+      getPolygon:d=>d,getFillColor:[255,90,60,55],getLineColor:[255,90,60,200],
+      getLineWidth:3,lineWidthUnits:'pixels',extruded:true,getElevation:120,stroked:true,filled:true}));
+  }
+  if(replay.destinations)
+    L.push(new deck.ScatterplotLayer({id:'dest',data:replay.destinations,
+      getPosition:d=>[d[0],d[1]],getFillColor:[70,224,192,230],getLineColor:[255,255,255,220],
+      stroked:true,getLineWidth:2,lineWidthUnits:'pixels',
+      getRadius:80,radiusUnits:'meters',radiusMinPixels:7,radiusMaxPixels:16}));
+  if(layersState.veh && fr)
+    L.push(new deck.ScatterplotLayer({id:'veh',data:fr.pts,
+      getPosition:d=>[d[0],d[1]],getFillColor:d=>KIND_COLOR[d[2]]||[200,200,200],
+      getRadius:d=>d[2]>=2?26:16,radiusUnits:'meters',radiusMinPixels:2,radiusMaxPixels:6,
+      stroked:false,updateTriggers:{getPosition:t,getFillColor:t}}));
+  return L;
+}
+
+function initDeck(){
+  vs=initViewState();
+  const layers=buildLayers();
+  if(deckgl){ deckgl.setProps({viewState:vs,layers}); return; }
+  deckgl=new deck.DeckGL({container:'deck',viewState:vs,controller:true,
+    views:[new deck.MapView({repeat:false})],
+    onViewStateChange:({viewState})=>{vs=viewState; deckgl.setProps({viewState:vs});},
+    parameters:{clearColor:[0.04,0.055,0.08,1]},layers});
+}
+
+function setTime(tt){
+  t=Math.max(0,Math.min(horizon,tt));
+  $('#clock').textContent=fmtT(t); $('#tl-t').textContent='T+'+fmtT(t);
+  $('#scrub').value=t;
+  const fr=nearestFrame(t);
+  if(fr){ const s=fr.stats;
+    const pct=s.present?Math.round(100*s.reached/s.present):0;
+    $('#s-reached').textContent=s.reached.toLocaleString()+' ('+pct+'%)';
+    $('#s-reached-bar').style.width=pct+'%';
+    $('#s-transit').textContent=(s.present-s.reached-0).toLocaleString();
+    $('#s-exposed').textContent=s.exposed.toLocaleString();
+    $('#s-trapped').textContent=s.trapped_vehicles.toLocaleString();
+    const cp=s.carless_present||0, cpct=cp?Math.round(100*s.carless_reached/cp):0;
+    $('#s-carless').textContent=s.carless_reached.toLocaleString()+' ('+cpct+'%)';
+    $('#s-carless-bar').style.width=cpct+'%';
+    $('#s-carless-n').textContent=cp.toLocaleString();
+    $('#s-av').textContent=(s.av_active||0).toLocaleString();
+    $('#s-closed').textContent=(s.closed_links||0).toLocaleString();
+  }
+  if(deckgl) deckgl.setProps({layers:buildLayers(),
+    parameters:{clearColor: layersState.map?[0.95,0.95,0.96,1]:[0.04,0.055,0.08,1]}});
+}
+
+function play(on){ playing=on; $('#btn-play').textContent=on?'❚❚':'▶';
+  $('#play-state').textContent=on?'● LIVE':'● PAUSED';
+  $('#play-state').style.color=on?'var(--good)':'var(--muted)'; }
+
+let loopStarted=false;
+function startLoop(){ if(loopStarted) return; loopStarted=true;
+  lastRAF=performance.now(); requestAnimationFrame(loop); }
+function loop(now){
+  const dt=Math.min(0.1,(now-lastRAF)/1000); lastRAF=now;
+  if(layersState.spin && vs){ vs={...vs,bearing:(vs.bearing+dt*6)%360}; deckgl.setProps({viewState:vs}); }
+  if(playing){
+    let nt=t+dt*speed;
+    if(nt>=horizon){ setTime(horizon); play(false); } else setTime(nt);
+  }
+  requestAnimationFrame(loop);
+}
+
+// wire controls
+$('#btn-play').onclick=()=>play(!playing);
+$('#btn-restart').onclick=()=>{setTime(0);play(true);};
+$('#btn-end').onclick=()=>{play(false);setTime(horizon);};
+$('#speed').oninput=e=>{speed=+e.target.value;$('#speed-v').textContent=speed+'×';};
+$('#scrub').oninput=e=>{play(false);setTime(+e.target.value);};
+['map','roads','origins','fire','veh','spin'].forEach(k=>{
+  $('#ly-'+k).onchange=e=>{layersState[k]=e.target.checked;
+    if(k==='spin'&&!e.target.checked){} setTime(t);};
+});
+// ---------------- guided tour (dependency-free) ----------------
+const TOUR=[
+  {el:'#hdr', title:'Mission control', place:'bottom',
+   text:'This is the live viewer for the Altadena evacuation simulation. The top bar shows the data source, scenario, play state, and elapsed time (T+).'},
+  {el:'#scenarios',
+   text:'Pick a scenario here. Each button is one saved simulation run — the % shows how many people (and how many carless households) reached safety in that run.',
+   title:'1 · Choose a scenario'},
+  {el:'.transport', title:'2 · Play it',
+   text:'Restart ⟲, Play/Pause ▶, or jump to the end ⇥. Playback is a smooth frame-by-frame replay of the run.'},
+  {el:'#ctl-speed', title:'3 · Speed',
+   text:'Drag to fast-forward — up to 120× real time — so a multi-hour evacuation plays in under a minute.'},
+  {el:'#grp-layers', title:'4 · Layers',
+   text:'Turn things on or off: “Map” is the grayscale street map, “Homes” the households, “Fire” the fire front, “Vehicles” the moving cars. “Roads” overlays the exact road network the model uses, and “Spin” slowly orbits the camera for a 3-D feel.'},
+  {el:'#center', title:'5 · The map',
+   text:'A real street map of Altadena, tilted in 3-D. On top of it: pink dots = homes with no car · green markers = safety exits (freeway on-ramps) · the red shape = the advancing fire · colored dots = moving vehicles. Drag to rotate, scroll to zoom (after the tour).'},
+  {el:'#tl', title:'6 · Timeline',
+   text:'Scrub to any moment in the evacuation, or just press play and watch it unfold.'},
+  {el:'#right', title:'7 · Live outcomes',
+   text:'These counters update as it plays: people reaching safety, people exposed to the fire, and a dedicated carless-households panel — the focus of this research.'},
+  {el:'#results-btn', title:'8 · Results', place:'bottom',
+   text:'See every scenario’s outcomes side by side — a comparison table plus charts (click any chart to enlarge) — and download the data as a spreadsheet (CSV) or JSON.'},
+  {el:'#about-btn', title:'9 · Sources & methods', place:'bottom',
+   text:'Everything behind the model — every data source, how each parameter was chosen, what was verified, and the honest caveats — is explained here.'},
+  {el:'#tour-btn', title:'You’re all set!', place:'bottom',
+   text:'Relaunch this tour any time from the “? Tour” button. Try the two REAL-population scenarios to compare no-AV vs. AVs. Enjoy!'},
+];
+let tourStep=-1;
+const tourActive=()=>tourStep>=0;
+
+function layoutTour(){
+  const s=TOUR[tourStep]; const el=s&&document.querySelector(s.el);
+  if(!el){ return goTo(tourStep+1); }
+  const r=el.getBoundingClientRect(), pad=6, box=$('#tour-box'), pop=$('#tour-pop');
+  box.style.display='block';
+  box.style.left=(r.left-pad)+'px'; box.style.top=(r.top-pad)+'px';
+  box.style.width=(r.width+pad*2)+'px'; box.style.height=(r.height+pad*2)+'px';
+  $('#tour-title').textContent=s.title;
+  $('#tour-text').textContent=s.text;
+  $('#tour-prog').textContent='Step '+(tourStep+1)+' of '+TOUR.length;
+  $('#tour-back').style.visibility=tourStep===0?'hidden':'visible';
+  $('#tour-next').textContent=tourStep===TOUR.length-1?'Finish':'Next';
+  pop.style.display='block';
+  const pw=pop.offsetWidth||320, ph=pop.offsetHeight||170, gap=14, vw=innerWidth, vh=innerHeight;
+  let left,top;
+  if(s.place!=='bottom' && r.right+gap+pw<vw){ left=r.right+gap; top=clamp(r.top,8,vh-ph-8); }
+  else if(s.place!=='bottom' && r.left-gap-pw>0){ left=r.left-gap-pw; top=clamp(r.top,8,vh-ph-8); }
+  else if(r.bottom+gap+ph<vh){ left=clamp(r.left,8,vw-pw-8); top=r.bottom+gap; }
+  else { left=clamp(r.left,8,vw-pw-8); top=clamp(r.top-gap-ph,8,vh-ph-8); }
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function goTo(i){ if(i>=TOUR.length) return endTour(); tourStep=Math.max(0,i);
+  $('#tour-blocker').style.display='block'; layoutTour(); }
+function startTour(){ markTourSeen(); $('#tour-prompt').style.display='none'; goTo(0); }
+function endTour(){ tourStep=-1;
+  ['#tour-box','#tour-pop','#tour-blocker'].forEach(x=>$(x).style.display='none'); }
+
+function markTourSeen(){ try{ localStorage.setItem('altadena_tour_seen','1'); }catch(e){} }
+function tourSeen(){ try{ return localStorage.getItem('altadena_tour_seen')==='1'; }catch(e){ return false; } }
+
+$('#tour-next').onclick=()=>goTo(tourStep+1);
+$('#tour-back').onclick=()=>goTo(tourStep-1);
+$('#tour-end').onclick=endTour;
+$('#tour-blocker').onclick=endTour;
+$('#tour-btn').onclick=startTour;
+$('#tour-yes').onclick=startTour;
+$('#tour-no').onclick=()=>{ markTourSeen(); $('#tour-prompt').style.display='none'; };
+// ---------------- sources & methods (opens in a big new tab) ----------------
+function updateAboutNote(){
+  const m=replay&&replay.meta, el=$('#about-scenote');
+  if(m){ const s=m.summary||{};
+    el.innerHTML='<b>Loaded scenario:</b> '+(m.label||'')+' — '+(m.note||'')+
+      (s.reached_frac!=null?' · reached '+Math.round(s.reached_frac*100)+'%':'')+
+      (s.carless_reached_frac!=null?', carless '+Math.round(s.carless_reached_frac*100)+'%':'');
+  } else el.textContent='No scenario loaded yet.';
+}
+const ABOUT_CSS=`
+  :root{--accent:#0a7f6b;--muted:#6b7684;--good:#1a8a4a;--edge:#d8dee6}
+  *{box-sizing:border-box}
+  body{margin:0;background:#f4f6f9;color:#1c2430;
+    font:16px/1.7 "Segoe UI",Inter,system-ui,-apple-system,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 28px 80px}
+  h1{font-size:30px;margin:0 0 4px;color:#0f1722;letter-spacing:.2px}
+  .sub{color:var(--muted);margin:0 0 24px;font-size:15px}
+  h3{font-size:20px;margin:34px 0 10px;color:#0f1722}
+  p,li{font-size:16px}
+  ul{padding-left:22px} li{margin:7px 0}
+  b{color:#0f1722}
+  .mut{color:var(--muted)}
+  code{background:#eef1f5;border:1px solid var(--edge);border-radius:4px;padding:1px 6px;font-size:14px}
+  .scenote{border:1px solid var(--edge);background:#eaf1ff;border-radius:10px;
+    padding:12px 16px;margin:0 0 20px;font-size:15px;color:#2b3a52}
+  .callout{border-left:5px solid #e0a500;background:#fff8e6;border-radius:8px;
+    padding:14px 18px;margin:16px 0;font-size:15.5px}
+  .callout.good{border-left-color:var(--good);background:#eaf7ee}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:15px}
+  td,th{border:1px solid var(--edge);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:#eef1f5;color:#394250;font-weight:600}
+  @media print{body{background:#fff}.wrap{max-width:100%}}
+`;
+function openAbout(){
+  $('#about-btn').classList.add('glow-off');   // stop glowing once they've found it
+  updateAboutNote();
+  const body=$('#about .body').innerHTML;
+  const doc='<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+    +'<meta name="viewport" content="width=device-width,initial-scale=1">'
+    +'<title>Altadena Evacuation — Sources & Methods</title><style>'+ABOUT_CSS+'</style>'
+    +'</head><body><div class="wrap"><h1>Altadena Evacuation Model</h1>'
+    +'<p class="sub">Sources &amp; Methods — plain-language explanation</p>'
+    +body+'</div></body></html>';
+  const w=window.open('','_blank');
+  if(w){ w.document.open(); w.document.write(doc); w.document.close(); }
+  else { // popup blocked -> fall back to a blob link in a new tab
+    const url=URL.createObjectURL(new Blob([doc],{type:'text/html'}));
+    window.open(url,'_blank');
+  }
+}
+$('#about-btn').onclick=openAbout;
+
+// ---------------- results panel (view + download all scenarios) ----------------
+const RES_COLS=[
+  ["scenario","Scenario"],["population","Population"],["n_present","People present"],
+  ["reached_frac","Reached"],["carless_reached_frac","Carless reached"],
+  ["carless_n","Carless people"],["n_exposed","Exposed"],
+  ["n_trapped_vehicles","Trapped vehicles"],["full_clearance","Everyone out?"],
+  ["fleet_size","AV fleet"],["policy","Policy"]];
+function resRows(){
+  return Object.values(INDEX).map(e=>{
+    const s=e.summary||{};
+    return {scenario:e.label, population:(e.population||'').replace(/ —.*/,''),
+      n_present:s.n_present, reached_frac:s.reached_frac,
+      carless_reached_frac:s.carless_reached_frac, carless_n:s.carless_n,
+      n_exposed:s.n_exposed, n_trapped_vehicles:s.n_trapped_vehicles,
+      full_clearance:s.full_clearance, fleet_size:s.fleet_size, policy:s.policy};
+  });
+}
+const pct=v=>v==null?'—':Math.round(v*100)+'%';
+const num=v=>v==null?'—':Number(v).toLocaleString();
+function buildResultsTable(){
+  const rows=resRows();
+  if(!rows.length){ $('#results-table').innerHTML='<p class="mut">No scenarios yet.</p>'; return; }
+  let h='<table><thead><tr>'+RES_COLS.map(c=>'<th>'+c[1]+'</th>').join('')+'</tr></thead><tbody>';
+  for(const r of rows){
+    h+='<tr>';
+    h+='<td>'+r.scenario+'</td>';
+    h+='<td class="pop">'+(r.population||'—')+'</td>';
+    h+='<td>'+num(r.n_present)+'</td>';
+    h+='<td class="good">'+pct(r.reached_frac)+'</td>';
+    h+='<td class="'+(r.carless_reached_frac?'good':'warn')+'">'+pct(r.carless_reached_frac)+'</td>';
+    h+='<td>'+num(r.carless_n)+'</td>';
+    h+='<td class="warn">'+num(r.n_exposed)+'</td>';
+    h+='<td>'+num(r.n_trapped_vehicles)+'</td>';
+    h+='<td>'+(r.full_clearance?'Yes':'No')+'</td>';
+    h+='<td>'+num(r.fleet_size)+'</td>';
+    h+='<td>'+(r.policy||'—')+'</td>';
+    h+='</tr>';
+  }
+  $('#results-table').innerHTML=h+'</tbody></table>';
+}
+const CHARTS=[
+  ["reached_vs_carless.png","Who reaches safety: overall vs. carless households"],
+  ["left_behind_exposed.png","Left behind & exposed (share of people)"],
+  ["completion_over_time.png","Evacuation completion over time"],
+  ["population_fit.png","Synthetic-population fit error by neighborhood"],
+];
+function buildResultsCharts(){
+  const box=$('#results-charts'); box.innerHTML='';
+  CHARTS.forEach(([file,cap])=>{
+    const src=(window.__CHARTS__&&window.__CHARTS__[file]) || ('./charts/'+file+'?_='+Date.now());
+    const fig=document.createElement('figure');
+    const img=document.createElement('img');
+    img.src=src; img.alt=cap; img.loading='lazy';
+    img.onclick=()=>window.open(src,'_blank');     // click to view full size
+    img.onerror=()=>fig.remove();                   // hide if not generated
+    const fc=document.createElement('figcaption'); fc.textContent=cap;
+    fig.appendChild(img); fig.appendChild(fc); box.appendChild(fig);
+  });
+}
+function openResults(){ buildResultsTable(); buildResultsCharts(); $('#results').style.display='flex'; }
+function closeResults(){ $('#results').style.display='none'; }
+const resultsOpen=()=>$('#results').style.display==='flex';
+function download(name,text,type){
+  const url=URL.createObjectURL(new Blob([text],{type}));
+  const a=document.createElement('a'); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+function downloadCSV(){
+  const rows=resRows();
+  const esc=v=>{ v=(v==null?'':String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const head=RES_COLS.map(c=>c[1]);
+  const lines=[head.join(',')];
+  for(const r of rows) lines.push(RES_COLS.map(c=>esc(r[c[0]])).join(','));
+  download('altadena_results.csv', lines.join('\n'), 'text/csv');
+}
+function downloadJSON(){ download('altadena_results.json',
+  JSON.stringify(resRows(),null,2), 'application/json'); }
+$('#results-btn').onclick=openResults;
+$('#results-close').onclick=closeResults;
+$('#results-csv').onclick=downloadCSV;
+$('#results-json').onclick=downloadJSON;
+$('#results').onclick=e=>{ if(e.target===$('#results')) closeResults(); };
+
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return;
+  if(resultsOpen()) closeResults(); else if(tourActive()) endTour(); });
+addEventListener('resize',()=>{ if(tourActive()) layoutTour(); });
+
+loadIndex();
+// offer the tour on first load (non-blocking; relaunch any time via ? Tour)
+setTimeout(()=>{ if(!tourSeen()) $('#tour-prompt').style.display='flex'; }, 500);
+</script>
+</body>
+</html>
