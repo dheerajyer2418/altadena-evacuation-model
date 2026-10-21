@@ -459,6 +459,13 @@ async function loadReplay(file){
     $('#src-tag').textContent = replay.meta?.note?.slice(0,42) || '';
     $('#mode-tag').textContent = (replay.meta?.mode||'')+' · '+(replay.meta?.policy||'');
     $('#foot-note').textContent = replay.meta?.note || '';
+    // The toy demo is a synthetic grid, not real geography — hide the street map
+    // for it (and show the road overlay so the grid is visible instead).
+    const isToy = (replay.meta?.mode === 'toy');
+    layersState.map = !isToy;
+    layersState.roads = isToy;
+    $('#ly-map').checked = layersState.map;
+    $('#ly-roads').checked = layersState.roads;
     t=0; initDeck(); setTime(0); play(false); startLoop();
     $('#loading').style.display='none';
   }catch(e){ console.error(e); $('#loading').textContent='failed to load '+file; }
