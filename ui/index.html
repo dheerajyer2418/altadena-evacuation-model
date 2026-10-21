@@ -121,6 +121,28 @@
   }
   #about-btn{animation:srcGlow 1.8s ease-in-out infinite;color:var(--accent2)}
   #about-btn:hover,#about-btn.glow-off{animation:none;border-color:var(--accent);color:var(--text)}
+
+  /* ---- results panel ---- */
+  #results{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(5,8,13,.72);backdrop-filter:blur(3px)}
+  #results .card{background:linear-gradient(180deg,#141d29,#0d151f);border:1px solid var(--edge);
+    border-radius:14px;width:min(960px,95vw);max-height:90vh;overflow:auto;box-shadow:0 24px 70px #000c}
+  #results header{position:sticky;top:0;background:#111a26;border-bottom:1px solid var(--edge);
+    padding:14px 20px;display:flex;align-items:center;gap:10px;z-index:1}
+  #results h2{margin:0;font-size:17px;color:#fff}
+  #results header .sp{margin-left:auto}
+  #results header button{width:auto;padding:7px 14px;font-size:13px}
+  #results header button.dl{border-color:var(--accent);background:#163b36;color:#fff;margin-left:6px}
+  #results .body{padding:14px 20px 22px}
+  #results table{width:100%;border-collapse:collapse;font-size:13px}
+  #results th,#results td{border:1px solid var(--edge);padding:8px 10px;text-align:right;white-space:nowrap}
+  #results th:first-child,#results td:first-child{text-align:left;white-space:normal;min-width:180px}
+  #results th{background:#17202e;color:var(--muted);position:sticky;top:52px}
+  #results tr:hover td{background:#131c28}
+  #results .pop{font-size:11px;color:var(--muted)}
+  #results .good{color:var(--good);font-weight:700}
+  #results .warn{color:var(--carless);font-weight:700}
+  #results .cap{font-size:11px;color:var(--muted);margin:10px 2px 0;line-height:1.5}
 </style>
 </head>
 <body>
@@ -131,6 +153,7 @@
     <span class="tag" id="mode-tag"></span>
     <div class="live"><span id="play-state">● PAUSED</span>
       <span>T+</span><span id="clock">00:00</span>
+      <button id="results-btn" title="View & download results for all scenarios" style="width:auto;padding:5px 12px;margin-left:6px">📊 Results</button>
       <button id="about-btn" title="Sources & methodology" style="width:auto;padding:5px 12px;margin-left:6px">ⓘ Sources</button>
       <button id="tour-btn" title="Guided tour" style="width:auto;padding:5px 12px;margin-left:6px">? Tour</button></div>
   </div>
@@ -152,7 +175,8 @@
 
     <h2 class="sec" style="margin-top:16px">Layers</h2>
     <div id="grp-layers">
-      <div class="ctl"><label>Roads</label><input id="ly-roads" type="checkbox" checked></div>
+      <div class="ctl"><label>Map</label><input id="ly-map" type="checkbox" checked></div>
+      <div class="ctl"><label>Roads</label><input id="ly-roads" type="checkbox"></div>
       <div class="ctl"><label>Homes</label><input id="ly-origins" type="checkbox" checked></div>
       <div class="ctl"><label>Fire</label><input id="ly-fire" type="checkbox" checked></div>
       <div class="ctl"><label>Vehicles</label><input id="ly-veh" type="checkbox" checked></div>
@@ -197,6 +221,25 @@
       <span><i class="dot" style="background:#ff5a3c"></i>fire front</span>
       <span><i class="dot" style="background:#46e0c0"></i>safety exit</span>
       <span class="note" id="foot-note"></span>
+    </div>
+  </div>
+</div>
+
+<!-- results panel -->
+<div id="results">
+  <div class="card">
+    <header><h2>Results — all scenarios</h2>
+      <span class="sp"></span>
+      <button class="dl" id="results-csv" title="Download a spreadsheet (CSV)">⬇ Download CSV</button>
+      <button id="results-json" title="Download raw JSON">⬇ JSON</button>
+      <button id="results-close" title="Close">✕</button></header>
+    <div class="body">
+      <div id="results-table">loading…</div>
+      <p class="cap">“Reached” = share of people present who got to safety · “Carless”
+        = same for households with no car (the study’s focus) · “Exposed” = people the
+        fire front reached (a danger signal, not a casualty count). These are
+        hypothetical, uncalibrated scenarios — compare them to each other, not as
+        predictions. CSV opens directly in Excel.</p>
     </div>
   </div>
 </div>
@@ -379,14 +422,15 @@ const fmtT = s => { s=Math.max(0,Math.round(s)); const m=Math.floor(s/60),ss=s%6
   return String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0'); };
 
 let deckgl=null, replay=null, frames=[], playing=false, speed=40, t=0, horizon=0;
-let layersState={roads:true,origins:true,fire:true,veh:true,spin:false};
-let lastRAF=null, vs=null;
+let layersState={map:true,roads:false,origins:true,fire:true,veh:true,spin:false};
+let lastRAF=null, vs=null, INDEX={};
 
 async function loadIndex(){
   try{
     // Standalone mode: data embedded by export_standalone.py (works via file://).
     const idx = window.__INDEX__ ||
       await (await fetch('../outputs/ui/index.json?_='+Date.now())).json();
+    INDEX = idx;
     const box = $('#scenarios'); box.innerHTML='';
     const items = Object.values(idx);
     if(!items.length){ box.innerHTML='<div class="note">No replays yet. Run <code>export_replay</code>.</div>'; return; }
@@ -454,9 +498,22 @@ function nearestFrame(tt){
 const KIND_COLOR={1:[74,163,255],2:[255,210,74],3:[70,224,122]};
 function buildLayers(){
   const L=[]; const fr=nearestFrame(t);
+  // Google-Maps-style raster basemap (CARTO Voyager; no token needed)
+  if(layersState.map)
+    L.push(new deck.TileLayer({id:'basemap',
+      data:['https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+            'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+            'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'],
+      minZoom:0, maxZoom:19, tileSize:256,
+      renderSubLayers: props => {
+        const tb=props.tile.boundingBox, bx=props.tile.bbox;
+        const bounds = tb ? [tb[0][0],tb[0][1],tb[1][0],tb[1][1]]
+                          : [bx.west,bx.south,bx.east,bx.north];
+        return new deck.BitmapLayer(props,{data:null,image:props.data,bounds});
+      }}));
   if(layersState.roads && replay.roads)
     L.push(new deck.PathLayer({id:'roads',data:replay.roads,getPath:d=>d,
-      getColor:[70,90,120,120],getWidth:2,widthUnits:'pixels'}));
+      getColor:layersState.map?[20,80,160,150]:[70,90,120,120],getWidth:2,widthUnits:'pixels'}));
   if(layersState.origins && replay.origins)
     L.push(new deck.ScatterplotLayer({id:'homes',data:replay.origins,
       getPosition:d=>[d[0],d[1]],getFillColor:d=>d[2]?[255,82,119,180]:[90,110,140,90],
@@ -535,7 +592,7 @@ $('#btn-restart').onclick=()=>{setTime(0);play(true);};
 $('#btn-end').onclick=()=>{play(false);setTime(horizon);};
 $('#speed').oninput=e=>{speed=+e.target.value;$('#speed-v').textContent=speed+'×';};
 $('#scrub').oninput=e=>{play(false);setTime(+e.target.value);};
-['roads','origins','fire','veh','spin'].forEach(k=>{
+['map','roads','origins','fire','veh','spin'].forEach(k=>{
   $('#ly-'+k).onchange=e=>{layersState[k]=e.target.checked;
     if(k==='spin'&&!e.target.checked){} setTime(t);};
 });
@@ -558,7 +615,9 @@ const TOUR=[
    text:'Scrub to any moment in the evacuation, or just press play and watch it unfold.'},
   {el:'#right', title:'7 · Live outcomes',
    text:'These counters update as it plays: people reaching safety, people exposed to the fire, and a dedicated carless-households panel — the focus of this research.'},
-  {el:'#about-btn', title:'8 · Sources & methods', place:'bottom',
+  {el:'#results-btn', title:'8 · Results', place:'bottom',
+   text:'See every scenario’s outcomes side by side in a table, and download them as a spreadsheet (CSV, opens in Excel) or JSON.'},
+  {el:'#about-btn', title:'9 · Sources & methods', place:'bottom',
    text:'Everything behind the model — every data source, how each parameter was chosen, what was verified, and the honest caveats — is explained here.'},
   {el:'#tour-btn', title:'You’re all set!', place:'bottom',
    text:'Relaunch this tour any time from the “? Tour” button. Try the two REAL-population scenarios to compare no-AV vs. AVs. Enjoy!'},
@@ -656,7 +715,73 @@ function openAbout(){
 }
 $('#about-btn').onclick=openAbout;
 
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&tourActive()) endTour(); });
+// ---------------- results panel (view + download all scenarios) ----------------
+const RES_COLS=[
+  ["scenario","Scenario"],["population","Population"],["n_present","People present"],
+  ["reached_frac","Reached"],["carless_reached_frac","Carless reached"],
+  ["carless_n","Carless people"],["n_exposed","Exposed"],
+  ["n_trapped_vehicles","Trapped vehicles"],["full_clearance","Everyone out?"],
+  ["fleet_size","AV fleet"],["policy","Policy"]];
+function resRows(){
+  return Object.values(INDEX).map(e=>{
+    const s=e.summary||{};
+    return {scenario:e.label, population:(e.population||'').replace(/ —.*/,''),
+      n_present:s.n_present, reached_frac:s.reached_frac,
+      carless_reached_frac:s.carless_reached_frac, carless_n:s.carless_n,
+      n_exposed:s.n_exposed, n_trapped_vehicles:s.n_trapped_vehicles,
+      full_clearance:s.full_clearance, fleet_size:s.fleet_size, policy:s.policy};
+  });
+}
+const pct=v=>v==null?'—':Math.round(v*100)+'%';
+const num=v=>v==null?'—':Number(v).toLocaleString();
+function buildResultsTable(){
+  const rows=resRows();
+  if(!rows.length){ $('#results-table').innerHTML='<p class="mut">No scenarios yet.</p>'; return; }
+  let h='<table><thead><tr>'+RES_COLS.map(c=>'<th>'+c[1]+'</th>').join('')+'</tr></thead><tbody>';
+  for(const r of rows){
+    h+='<tr>';
+    h+='<td>'+r.scenario+'</td>';
+    h+='<td class="pop">'+(r.population||'—')+'</td>';
+    h+='<td>'+num(r.n_present)+'</td>';
+    h+='<td class="good">'+pct(r.reached_frac)+'</td>';
+    h+='<td class="'+(r.carless_reached_frac?'good':'warn')+'">'+pct(r.carless_reached_frac)+'</td>';
+    h+='<td>'+num(r.carless_n)+'</td>';
+    h+='<td class="warn">'+num(r.n_exposed)+'</td>';
+    h+='<td>'+num(r.n_trapped_vehicles)+'</td>';
+    h+='<td>'+(r.full_clearance?'Yes':'No')+'</td>';
+    h+='<td>'+num(r.fleet_size)+'</td>';
+    h+='<td>'+(r.policy||'—')+'</td>';
+    h+='</tr>';
+  }
+  $('#results-table').innerHTML=h+'</tbody></table>';
+}
+function openResults(){ buildResultsTable(); $('#results').style.display='flex'; }
+function closeResults(){ $('#results').style.display='none'; }
+const resultsOpen=()=>$('#results').style.display==='flex';
+function download(name,text,type){
+  const url=URL.createObjectURL(new Blob([text],{type}));
+  const a=document.createElement('a'); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+function downloadCSV(){
+  const rows=resRows();
+  const esc=v=>{ v=(v==null?'':String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const head=RES_COLS.map(c=>c[1]);
+  const lines=[head.join(',')];
+  for(const r of rows) lines.push(RES_COLS.map(c=>esc(r[c[0]])).join(','));
+  download('altadena_results.csv', lines.join('\n'), 'text/csv');
+}
+function downloadJSON(){ download('altadena_results.json',
+  JSON.stringify(resRows(),null,2), 'application/json'); }
+$('#results-btn').onclick=openResults;
+$('#results-close').onclick=closeResults;
+$('#results-csv').onclick=downloadCSV;
+$('#results-json').onclick=downloadJSON;
+$('#results').onclick=e=>{ if(e.target===$('#results')) closeResults(); };
+
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return;
+  if(resultsOpen()) closeResults(); else if(tourActive()) endTour(); });
 addEventListener('resize',()=>{ if(tourActive()) layoutTour(); });
 
 loadIndex();

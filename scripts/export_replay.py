@@ -90,7 +90,9 @@ def main():
     index[rid] = {"id": rid, "file": path.name, "label": label,
                   "reached_frac": row.get("reached_frac"),
                   "carless_reached_frac": row.get("carless_reached_frac"),
-                  "n_frames": len(sim.frames)}
+                  "n_frames": len(sim.frames),
+                  "population": result["meta"]["population_source"],
+                  "summary": row}
     with open(idx_path, "w", encoding="utf-8") as fh:
         json.dump(index, fh, indent=2)
 
