@@ -86,6 +86,33 @@
   #tour-prompt p{margin:0 0 18px;color:var(--muted);font-size:13px;line-height:1.5}
   #tour-prompt .row{display:flex;gap:10px;justify-content:center}
   #tour-prompt button{width:auto;padding:10px 20px;font-size:14px}
+
+  /* ---- sources & methods modal ---- */
+  #about{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(5,8,13,.72);backdrop-filter:blur(3px)}
+  #about .card{background:linear-gradient(180deg,#141d29,#0d151f);border:1px solid var(--edge);
+    border-radius:14px;width:min(820px,92vw);max-height:88vh;overflow:auto;
+    box-shadow:0 24px 70px #000c;position:relative}
+  #about .card>header{position:sticky;top:0;background:#111a26;border-bottom:1px solid var(--edge);
+    padding:16px 22px;display:flex;align-items:center;gap:12px;z-index:1}
+  #about h2{margin:0;font-size:18px;color:#fff;letter-spacing:.3px}
+  #about .close{margin-left:auto;width:auto;padding:4px 12px;font-size:16px}
+  #about .body{padding:8px 24px 26px}
+  #about h3{font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--accent);
+    margin:20px 0 6px;border-bottom:1px solid var(--edge);padding-bottom:5px}
+  #about p,#about li{font-size:13px;line-height:1.6;color:var(--text)}
+  #about ul{margin:6px 0;padding-left:18px}
+  #about b{color:#fff}
+  #about .mut{color:var(--muted)}
+  #about code{background:#0c131d;border:1px solid var(--edge);border-radius:4px;padding:1px 5px;font-size:12px}
+  #about .callout{border:1px solid #ffd24a55;background:#2a2410;border-radius:9px;
+    padding:12px 14px;margin:12px 0;font-size:12.5px;line-height:1.55}
+  #about .callout.good{border-color:#46e07a55;background:#102517}
+  #about .scenote{border:1px solid var(--edge);background:#0e1620;border-radius:9px;
+    padding:10px 14px;margin:4px 0 10px;font-size:12.5px;color:var(--muted)}
+  #about table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12.5px}
+  #about td,#about th{border:1px solid var(--edge);padding:6px 9px;text-align:left;vertical-align:top}
+  #about th{color:var(--muted);font-weight:600}
 </style>
 </head>
 <body>
@@ -96,6 +123,7 @@
     <span class="tag" id="mode-tag"></span>
     <div class="live"><span id="play-state">● PAUSED</span>
       <span>T+</span><span id="clock">00:00</span>
+      <button id="about-btn" title="Sources & methodology" style="width:auto;padding:5px 12px;margin-left:6px">ⓘ Sources</button>
       <button id="tour-btn" title="Guided tour" style="width:auto;padding:5px 12px;margin-left:6px">? Tour</button></div>
   </div>
 
@@ -161,6 +189,163 @@
       <span><i class="dot" style="background:#ff5a3c"></i>fire front</span>
       <span><i class="dot" style="background:#46e0c0"></i>safety exit</span>
       <span class="note" id="foot-note"></span>
+    </div>
+  </div>
+</div>
+
+<!-- sources & methodology modal -->
+<div id="about">
+  <div class="card">
+    <header><h2>Sources &amp; Methodology</h2>
+      <button class="close" id="about-close" title="Close">✕</button></header>
+    <div class="body">
+      <div class="scenote" id="about-scenote">Loaded scenario details appear here.</div>
+
+      <div class="callout"><b>Read this first.</b> These are <b>hypothetical</b>
+        evacuation scenarios for research, <b>not</b> a reconstruction of the
+        January-2025 Eaton Fire and <b>not</b> a prediction. The traffic model is
+        <b>uncalibrated</b> and the hazard is invented, so the numbers are only
+        meaningful as a <b>relative comparison</b> between policies run on identical
+        inputs. Software is tested; outcomes are not externally validated.</div>
+
+      <h3>What this is</h3>
+      <p>An agent-based model of wildfire evacuation in <b>pre-January-2025
+        Altadena, CA</b> (research with Dr. Sarah Grajdura, UIC). It represents
+        people, households (the decision-makers), private vehicles, and an
+        autonomous-vehicle (AV) fleet on a <b>real road network</b>, and compares
+        four AV dispatch policies — with a focus on households without a car.</p>
+
+      <h3>Data sources</h3>
+      <table>
+        <tr><th>Source</th><th>What / geography</th><th>Used for</th></tr>
+        <tr><td><b>U.S. Census ACS</b> 5-year, 2019–2023</td>
+            <td>Block-group tables B01001 (age×sex), B02001 (race), B03003
+                (Hispanic), B25044 (vehicles), B11016 (household size), B19001
+                (income), for the 34 Altadena block groups</td>
+            <td>Population marginals (who lives here)</td></tr>
+        <tr><td><b>ACS PUMS</b> 2023</td>
+            <td>Donor households from the containing PUMAs (03724, 03725) — broader
+                than Altadena</td>
+            <td>Whole-household “donor” records for synthesis</td></tr>
+        <tr><td><b>TIGER/Line</b> 2023</td>
+            <td>Place + block-group polygons</td>
+            <td>Selecting the 34 Altadena block groups; placing homes inside them</td></tr>
+        <tr><td><b>OpenStreetMap</b> (via osmnx)</td>
+            <td>Drivable road network, Altadena + 3&nbsp;km buffer (3,766 nodes /
+                9,972 directed edges)</td>
+            <td>The routable road graph</td></tr>
+        <tr><td><b>INRIX</b></td>
+            <td class="mut">none supplied</td>
+            <td class="mut">documented importer interface only — <b>no</b> data
+                imported, nothing calibrated from it</td></tr>
+      </table>
+      <p class="mut">OSM is a <b>current</b> snapshot stamped at download time — it
+        is not the January-2025 network. Race and Hispanic ethnicity are kept as
+        <b>separate</b> attributes.</p>
+
+      <h3>How the population was built</h3>
+      <p>Households are synthesized by <b>Iterative Proportional Updating (IPU)</b>:
+        real PUMS <i>donor households</i> are reweighted so that <b>both</b>
+        household marginals (vehicles, size, income) and person marginals (age×sex,
+        race, Hispanic) match each block group simultaneously. Because every
+        synthetic household is a real donor household, within-household structure
+        (who lives with whom, their ages, the car count) is inherited, not invented.</p>
+      <div class="callout good">Result: <b>~15,000 households / ~41,300 people</b>
+        across 34 block groups — within ~1% of ACS totals; mean per-block-group fit
+        error <b>SRMSE ≈ 0.06</b>. Fit error is reported per block group.</div>
+      <ul>
+        <li><b>Table-availability checks mattered:</b> B08201 (size×vehicles) and
+          B18101 (disability) are <b>null at block-group level</b>, so vehicles come
+          from <code>B25044</code> and size from <code>B11016</code>; <b>disability
+          is inherited from PUMS donors</b> (real DIS flags), not fitted.</li>
+        <li><b>Two ACS cell-mapping bugs were found &amp; fixed</b> during
+          verification (a female-age cell offset and an income-bracket index).</li>
+        <li><b>Known caveat:</b> synthesized carless rate <b>4.5%</b> vs ACS
+          <b>3.7%</b> — carless households are rare, so donor/small-count effects
+          slightly overstate them. Since they are the research focus, treat the
+          absolute carless count as approximate.</li>
+        <li><b>Not inferred from race</b>; <b>disability ≠ “cannot drive”</b>.
+          “Assistance need” is a separate, documented household flag. Group quarters
+          are excluded (a documented limitation).</li>
+      </ul>
+
+      <h3>Road network &amp; traffic (how congestion is modeled)</h3>
+      <p>A custom <b>mesoscopic</b> traffic engine — <b>not</b> fixed travel times.
+        Every road link has finite storage, a discharge (outflow) capacity, FIFO
+        queues, and <b>downstream blocking (spillback)</b>, so congestion emerges on
+        its own. One-way restrictions and link lengths are preserved.</p>
+      <ul>
+        <li><b>Speeds:</b> OSM <code>maxspeed</code> where tagged, otherwise a
+          road-class default — each edge records which (<i>provenance is auditable</i>).</li>
+        <li><b>Capacity:</b> 1,800 veh/hour/lane (a standard planning default) and a
+          jam density for storage. <b class="mut">These are assumptions, not
+          calibrated to Altadena</b> — no INRIX/count data were used.</li>
+        <li><b>Destinations:</b> southbound exits toward the I-210 / Pasadena — a
+          modeling choice, not an evacuation order. Origins that can’t reach an exit
+          are reported, never deleted.</li>
+      </ul>
+
+      <h3>Fire hazard (how it was chosen)</h3>
+      <p>A reproducible, time-dependent <b>anisotropic front</b> spreading from a
+        foothill ignition, pushed south-west (Santa-Ana-style). Two layers are kept
+        <b>strictly separate</b>: the <i>ground truth</i> (what actually closes roads
+        and exposes people) and the <i>forecast</i> the AV controller is allowed to
+        see (with lead time + error). The controller never sees the future unless an
+        experiment explicitly grants perfect information.</p>
+      <div class="callout"><b>Front speed = 0.6 m/s</b> by default. This is an
+        <b>illustrative</b> choice, not a calibrated value: the paper describes a
+        fast, “dire” fire, but a front so fast it traps everyone regardless of policy
+        leaves nothing to compare. 0.6 m/s stays dire while preserving an evacuation
+        window so policy differences are visible. <b>Edit it in
+        <code>config/hazard.yaml</code>.</b></div>
+      <p class="mut">“Exposure” means the fire front reached a person’s location — a
+        hazard-<i>contact</i> indicator, <b>not</b> injury or death. No casualty model
+        is implied. Vehicles caught on a closing road are held and exposed (and
+        reroute if possible), never silently removed.</p>
+
+      <h3>Evacuation behavior</h3>
+      <p>Five separable stages per household: <b>awareness → preparation → (AV)
+        request → departure/pickup → arrival</b>. Default timings are generic
+        lognormal <b>placeholders</b> (e.g. ~15 min awareness, ~20 min prep) in
+        <code>config/behavior.yaml</code> — easily replaced. Camp-Fire (2018) survey
+        coefficients are included only as an <b>optional, disabled</b> transfer
+        scenario, clearly labeled and <b>not</b> treated as validated for Altadena.
+        Smartphone ownership is modeled separately from a working comms network.</p>
+
+      <h3>AV fleet &amp; the four policies</h3>
+      <p>Fleet size is an <b>explicit number of vehicles</b> (not “market
+        penetration”). Carless households (and those with explicit assistance needs)
+        request AVs; everyone else drives. Common dispatch rules are identical across
+        policies so a comparison isolates the policy:</p>
+      <ul>
+        <li><b>Withdrawal</b> — stop accepting new pickups once the forecast front
+          nears the service area.</li>
+        <li><b>Normal</b> — first-come, first-served, no vulnerability priority.</li>
+        <li><b>Evacuation priority</b> — serve carless + assistance-need first.</li>
+        <li><b>Adaptive geofencing</b> — priority <i>plus</i> forecast screening:
+          accept a trip only if pickup + boarding + travel can finish before the
+          forecast fire reaches any point on the route; accepted trips are
+          reassessed as conditions change.</li>
+      </ul>
+
+      <h3>What was verified vs. not</h3>
+      <table>
+        <tr><th>Claim</th><th>Status</th></tr>
+        <tr><td>Software correctness (conservation, seat limits, no duplicate
+          pickups, queues/spillback, forecast boundary, reproducibility…)</td>
+          <td><b style="color:var(--good)">✓ 29 automated tests pass</b></td></tr>
+        <tr><td>Population fit to real Altadena ACS</td>
+          <td><b style="color:var(--good)">✓ measured</b> (SRMSE ≈ 0.06)</td></tr>
+        <tr><td>Traffic calibration (speeds/capacities vs observations)</td>
+          <td class="mut"><b>✗ none</b> (default capacities; no INRIX)</td></tr>
+        <tr><td>External validation (vs a real evacuation)</td>
+          <td class="mut"><b>✗ none</b></td></tr>
+      </table>
+      <p class="mut">Experiments use a fixed shared population and separate,
+        reproducible random streams for behavior, dispatch, and forecast error, so
+        policies are compared on identical inputs across seeds. Full repo docs:
+        <code>README.md</code>, <code>DATA_MANIFEST.md</code>,
+        <code>VALIDATION_REPORT.md</code>, <code>docs/ASSUMPTIONS.md</code>.</p>
     </div>
   </div>
 </div>
@@ -376,6 +561,8 @@ const TOUR=[
    text:'Scrub to any moment in the evacuation, or just press play and watch it unfold.'},
   {el:'#right', title:'7 · Live outcomes',
    text:'These counters update as it plays: people reaching safety, people exposed to the fire, and a dedicated carless-households panel — the focus of this research.'},
+  {el:'#about-btn', title:'8 · Sources & methods', place:'bottom',
+   text:'Everything behind the model — every data source, how each parameter was chosen, what was verified, and the honest caveats — is explained here.'},
   {el:'#tour-btn', title:'You’re all set!', place:'bottom',
    text:'Relaunch this tour any time from the “? Tour” button. Try the two REAL-population scenarios to compare no-AV vs. AVs. Enjoy!'},
 ];
@@ -420,7 +607,24 @@ $('#tour-blocker').onclick=endTour;
 $('#tour-btn').onclick=startTour;
 $('#tour-yes').onclick=startTour;
 $('#tour-no').onclick=()=>{ markTourSeen(); $('#tour-prompt').style.display='none'; };
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&tourActive()) endTour(); });
+// ---------------- sources & methods modal ----------------
+function updateAboutNote(){
+  const m=replay&&replay.meta, el=$('#about-scenote');
+  if(m){ const s=m.summary||{};
+    el.innerHTML='<b>Loaded scenario:</b> '+(m.label||'')+' — '+(m.note||'')+
+      (s.reached_frac!=null?' · reached '+Math.round(s.reached_frac*100)+'%':'')+
+      (s.carless_reached_frac!=null?', carless '+Math.round(s.carless_reached_frac*100)+'%':'');
+  } else el.textContent='No scenario loaded yet.';
+}
+function openAbout(){ updateAboutNote(); $('#about').style.display='flex'; }
+function closeAbout(){ $('#about').style.display='none'; }
+const aboutOpen=()=>$('#about').style.display==='flex';
+$('#about-btn').onclick=openAbout;
+$('#about-close').onclick=closeAbout;
+$('#about').onclick=e=>{ if(e.target===$('#about')) closeAbout(); };
+
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return;
+  if(aboutOpen()) closeAbout(); else if(tourActive()) endTour(); });
 addEventListener('resize',()=>{ if(tourActive()) layoutTour(); });
 
 loadIndex();
