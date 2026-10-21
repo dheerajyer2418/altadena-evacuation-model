@@ -498,7 +498,8 @@ function nearestFrame(tt){
 const KIND_COLOR={1:[74,163,255],2:[255,210,74],3:[70,224,122]};
 function buildLayers(){
   const L=[]; const fr=nearestFrame(t);
-  // Real street basemap — OpenStreetMap standard tiles (no API key required)
+  // Street basemap — OpenStreetMap tiles (no API key), rendered as light
+  // grayscale ("toner-lite" look) via BitmapLayer's built-in desaturate.
   if(layersState.map)
     L.push(new deck.TileLayer({id:'basemap',
       data:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -507,7 +508,8 @@ function buildLayers(){
         const tb=props.tile.boundingBox, bx=props.tile.bbox;
         const bounds = tb ? [tb[0][0],tb[0][1],tb[1][0],tb[1][1]]
                           : [bx.west,bx.south,bx.east,bx.north];
-        return new deck.BitmapLayer(props,{data:null,image:props.data,bounds});
+        return new deck.BitmapLayer(props,{data:null,image:props.data,bounds,
+          desaturate:1, opacity:0.78});   // grayscale + slightly faded = toner-lite
       }}));
   if(layersState.roads && replay.roads)
     L.push(new deck.PathLayer({id:'roads',data:replay.roads,getPath:d=>d,
@@ -564,7 +566,8 @@ function setTime(tt){
     $('#s-av').textContent=(s.av_active||0).toLocaleString();
     $('#s-closed').textContent=(s.closed_links||0).toLocaleString();
   }
-  if(deckgl) deckgl.setProps({layers:buildLayers()});
+  if(deckgl) deckgl.setProps({layers:buildLayers(),
+    parameters:{clearColor: layersState.map?[0.95,0.95,0.96,1]:[0.04,0.055,0.08,1]}});
 }
 
 function play(on){ playing=on; $('#btn-play').textContent=on?'❚❚':'▶';
