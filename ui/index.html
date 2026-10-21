@@ -422,7 +422,7 @@ const fmtT = s => { s=Math.max(0,Math.round(s)); const m=Math.floor(s/60),ss=s%6
   return String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0'); };
 
 let deckgl=null, replay=null, frames=[], playing=false, speed=40, t=0, horizon=0;
-let layersState={map:true,roads:false,origins:true,fire:true,veh:true,spin:false};
+let layersState={map:true,roads:true,origins:true,fire:true,veh:true,spin:false};
 let lastRAF=null, vs=null, INDEX={};
 
 async function loadIndex(){
@@ -462,8 +462,8 @@ async function loadReplay(file){
     // The toy demo is a synthetic grid, not real geography — hide the street map
     // for it (and show the road overlay so the grid is visible instead).
     const isToy = (replay.meta?.mode === 'toy');
-    layersState.map = !isToy;
-    layersState.roads = isToy;
+    layersState.map = !isToy;      // street map only for real geography
+    layersState.roads = true;      // modeled road network on for every scenario
     $('#ly-map').checked = layersState.map;
     $('#ly-roads').checked = layersState.roads;
     t=0; initDeck(); setTime(0); play(false); startLoop();
