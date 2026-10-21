@@ -59,6 +59,33 @@
   #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     color:var(--muted);font-size:14px;background:#0a0e14cc;z-index:5}
   .pill{font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid var(--edge);color:var(--muted)}
+
+  /* ---- guided tour ---- */
+  #tour-blocker{position:fixed;inset:0;z-index:40;display:none;cursor:default}
+  #tour-box{position:fixed;z-index:41;border-radius:10px;pointer-events:none;
+    border:2px solid var(--accent);box-shadow:0 0 0 9999px rgba(5,8,13,.78),0 0 22px #46e0c0aa;
+    transition:all .32s cubic-bezier(.4,.1,.2,1);display:none}
+  #tour-pop{position:fixed;z-index:42;max-width:320px;background:linear-gradient(180deg,#16202e,#0f1824);
+    border:1px solid var(--accent);border-radius:12px;padding:16px 16px 12px;display:none;
+    box-shadow:0 10px 40px #000a;transition:all .28s ease}
+  #tour-pop h3{margin:0 0 7px;font-size:15px;color:#fff}
+  #tour-pop p{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text)}
+  #tour-pop .row{display:flex;align-items:center;gap:8px}
+  #tour-pop .prog{font-size:11px;color:var(--muted);margin-right:auto}
+  #tour-pop button{width:auto;padding:6px 14px;font-size:13px}
+  #tour-pop button.primary{border-color:var(--accent);background:#163b36;color:#fff}
+  #tour-pop .end{position:absolute;top:8px;right:10px;width:auto;padding:2px 8px;
+    background:transparent;border:none;color:var(--muted);font-size:16px}
+  #tour-pop .end:hover{color:#fff}
+  /* first-load prompt */
+  #tour-prompt{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+    background:rgba(5,8,13,.72);backdrop-filter:blur(2px)}
+  #tour-prompt .card{background:linear-gradient(180deg,#16202e,#0f1824);border:1px solid var(--accent);
+    border-radius:14px;padding:26px 28px;max-width:420px;text-align:center;box-shadow:0 20px 60px #000b}
+  #tour-prompt h2{margin:0 0 8px;font-size:20px;color:#fff;letter-spacing:.3px}
+  #tour-prompt p{margin:0 0 18px;color:var(--muted);font-size:13px;line-height:1.5}
+  #tour-prompt .row{display:flex;gap:10px;justify-content:center}
+  #tour-prompt button{width:auto;padding:10px 20px;font-size:14px}
 </style>
 </head>
 <body>
@@ -68,7 +95,8 @@
     <span class="tag" id="src-tag">loading…</span>
     <span class="tag" id="mode-tag"></span>
     <div class="live"><span id="play-state">● PAUSED</span>
-      <span>T+</span><span id="clock">00:00</span></div>
+      <span>T+</span><span id="clock">00:00</span>
+      <button id="tour-btn" title="Guided tour" style="width:auto;padding:5px 12px;margin-left:6px">? Tour</button></div>
   </div>
 
   <div id="left" class="panel">
@@ -82,16 +110,18 @@
       <button id="btn-play" title="Play/Pause">▶</button>
       <button id="btn-end" title="Jump to end">⇥</button>
     </div>
-    <div class="ctl"><label>Speed</label>
+    <div class="ctl" id="ctl-speed"><label>Speed</label>
       <input id="speed" type="range" min="1" max="120" value="40"/>
       <span id="speed-v" class="pill">40×</span></div>
 
     <h2 class="sec" style="margin-top:16px">Layers</h2>
-    <div class="ctl"><label>Roads</label><input id="ly-roads" type="checkbox" checked></div>
-    <div class="ctl"><label>Homes</label><input id="ly-origins" type="checkbox" checked></div>
-    <div class="ctl"><label>Fire</label><input id="ly-fire" type="checkbox" checked></div>
-    <div class="ctl"><label>Vehicles</label><input id="ly-veh" type="checkbox" checked></div>
-    <div class="ctl"><label>Spin</label><input id="ly-spin" type="checkbox"></div>
+    <div id="grp-layers">
+      <div class="ctl"><label>Roads</label><input id="ly-roads" type="checkbox" checked></div>
+      <div class="ctl"><label>Homes</label><input id="ly-origins" type="checkbox" checked></div>
+      <div class="ctl"><label>Fire</label><input id="ly-fire" type="checkbox" checked></div>
+      <div class="ctl"><label>Vehicles</label><input id="ly-veh" type="checkbox" checked></div>
+      <div class="ctl"><label>Spin</label><input id="ly-spin" type="checkbox"></div>
+    </div>
   </div>
 
   <div id="center" class="panel">
@@ -131,6 +161,32 @@
       <span><i class="dot" style="background:#ff5a3c"></i>fire front</span>
       <span><i class="dot" style="background:#46e0c0"></i>safety exit</span>
       <span class="note" id="foot-note"></span>
+    </div>
+  </div>
+</div>
+
+<!-- guided tour overlay -->
+<div id="tour-blocker"></div>
+<div id="tour-box"></div>
+<div id="tour-pop">
+  <button class="end" id="tour-end" title="End tour">✕</button>
+  <h3 id="tour-title"></h3>
+  <p id="tour-text"></p>
+  <div class="row">
+    <span class="prog" id="tour-prog"></span>
+    <button id="tour-back">Back</button>
+    <button id="tour-next" class="primary">Next</button>
+  </div>
+</div>
+<div id="tour-prompt">
+  <div class="card">
+    <h2>Welcome to Altadena Evacuation</h2>
+    <p>This is a live simulation viewer. Want a 60-second guided tour of how to
+       use it? You can stop any time, and relaunch it later with the “? Tour”
+       button up top.</p>
+    <div class="row">
+      <button id="tour-yes" class="primary">Yes, show me around</button>
+      <button id="tour-no">No thanks</button>
     </div>
   </div>
 </div>
@@ -301,7 +357,75 @@ $('#scrub').oninput=e=>{play(false);setTime(+e.target.value);};
   $('#ly-'+k).onchange=e=>{layersState[k]=e.target.checked;
     if(k==='spin'&&!e.target.checked){} setTime(t);};
 });
+// ---------------- guided tour (dependency-free) ----------------
+const TOUR=[
+  {el:'#hdr', title:'Mission control', place:'bottom',
+   text:'This is the live viewer for the Altadena evacuation simulation. The top bar shows the data source, scenario, play state, and elapsed time (T+).'},
+  {el:'#scenarios',
+   text:'Pick a scenario here. Each button is one saved simulation run — the % shows how many people (and how many carless households) reached safety in that run.',
+   title:'1 · Choose a scenario'},
+  {el:'.transport', title:'2 · Play it',
+   text:'Restart ⟲, Play/Pause ▶, or jump to the end ⇥. Playback is a smooth frame-by-frame replay of the run.'},
+  {el:'#ctl-speed', title:'3 · Speed',
+   text:'Drag to fast-forward — up to 120× real time — so a multi-hour evacuation plays in under a minute.'},
+  {el:'#grp-layers', title:'4 · Layers',
+   text:'Toggle roads, homes, the fire front, or vehicles. “Spin” slowly orbits the camera for a 3-D feel.'},
+  {el:'#center', title:'5 · The 3-D map',
+   text:'Altadena in 3-D. Grey lines = roads · pink dots = carless homes · green markers = safety exits · the red shape = the advancing fire front · moving dots = vehicles. After the tour you can drag to rotate and scroll to zoom.'},
+  {el:'#tl', title:'6 · Timeline',
+   text:'Scrub to any moment in the evacuation, or just press play and watch it unfold.'},
+  {el:'#right', title:'7 · Live outcomes',
+   text:'These counters update as it plays: people reaching safety, people exposed to the fire, and a dedicated carless-households panel — the focus of this research.'},
+  {el:'#tour-btn', title:'You’re all set!', place:'bottom',
+   text:'Relaunch this tour any time from the “? Tour” button. Try the two REAL-population scenarios to compare no-AV vs. AVs. Enjoy!'},
+];
+let tourStep=-1;
+const tourActive=()=>tourStep>=0;
+
+function layoutTour(){
+  const s=TOUR[tourStep]; const el=s&&document.querySelector(s.el);
+  if(!el){ return goTo(tourStep+1); }
+  const r=el.getBoundingClientRect(), pad=6, box=$('#tour-box'), pop=$('#tour-pop');
+  box.style.display='block';
+  box.style.left=(r.left-pad)+'px'; box.style.top=(r.top-pad)+'px';
+  box.style.width=(r.width+pad*2)+'px'; box.style.height=(r.height+pad*2)+'px';
+  $('#tour-title').textContent=s.title;
+  $('#tour-text').textContent=s.text;
+  $('#tour-prog').textContent='Step '+(tourStep+1)+' of '+TOUR.length;
+  $('#tour-back').style.visibility=tourStep===0?'hidden':'visible';
+  $('#tour-next').textContent=tourStep===TOUR.length-1?'Finish':'Next';
+  pop.style.display='block';
+  const pw=pop.offsetWidth||320, ph=pop.offsetHeight||170, gap=14, vw=innerWidth, vh=innerHeight;
+  let left,top;
+  if(s.place!=='bottom' && r.right+gap+pw<vw){ left=r.right+gap; top=clamp(r.top,8,vh-ph-8); }
+  else if(s.place!=='bottom' && r.left-gap-pw>0){ left=r.left-gap-pw; top=clamp(r.top,8,vh-ph-8); }
+  else if(r.bottom+gap+ph<vh){ left=clamp(r.left,8,vw-pw-8); top=r.bottom+gap; }
+  else { left=clamp(r.left,8,vw-pw-8); top=clamp(r.top-gap-ph,8,vh-ph-8); }
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function goTo(i){ if(i>=TOUR.length) return endTour(); tourStep=Math.max(0,i);
+  $('#tour-blocker').style.display='block'; layoutTour(); }
+function startTour(){ markTourSeen(); $('#tour-prompt').style.display='none'; goTo(0); }
+function endTour(){ tourStep=-1;
+  ['#tour-box','#tour-pop','#tour-blocker'].forEach(x=>$(x).style.display='none'); }
+
+function markTourSeen(){ try{ localStorage.setItem('altadena_tour_seen','1'); }catch(e){} }
+function tourSeen(){ try{ return localStorage.getItem('altadena_tour_seen')==='1'; }catch(e){ return false; } }
+
+$('#tour-next').onclick=()=>goTo(tourStep+1);
+$('#tour-back').onclick=()=>goTo(tourStep-1);
+$('#tour-end').onclick=endTour;
+$('#tour-blocker').onclick=endTour;
+$('#tour-btn').onclick=startTour;
+$('#tour-yes').onclick=startTour;
+$('#tour-no').onclick=()=>{ markTourSeen(); $('#tour-prompt').style.display='none'; };
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&tourActive()) endTour(); });
+addEventListener('resize',()=>{ if(tourActive()) layoutTour(); });
+
 loadIndex();
+// offer the tour on first load (non-blocking; relaunch any time via ? Tour)
+setTimeout(()=>{ if(!tourSeen()) $('#tour-prompt').style.display='flex'; }, 500);
 </script>
 </body>
 </html>
