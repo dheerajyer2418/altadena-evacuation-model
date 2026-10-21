@@ -134,6 +134,39 @@ Outputs (CSV/JSON, plots, maps) land in `outputs/<experiment>/`.
 
 ---
 
+## Data sources
+
+All inputs are official U.S. Census Bureau and OpenStreetMap data (full provenance —
+dates, geographies, universes, assumptions — in `DATA_MANIFEST.md`).
+
+**American Community Survey (ACS) — neighborhood totals (ages, race, income, vehicles, etc.)**
+- Overview: https://www.census.gov/programs-surveys/acs
+- Browse/download: https://data.census.gov
+- Developer API (ACS 5-year), used by the model: https://www.census.gov/data/developers/data-sets/acs-5year.html
+  (endpoint `https://api.census.gov/data/2023/acs/acs5`;
+  [variables](https://api.census.gov/data/2023/acs/acs5/variables.html) ·
+  [tables](https://api.census.gov/data/2023/acs/acs5/groups.html))
+- Tables used (2019–2023 5-year): [B01001 age/sex](https://data.census.gov/table/ACSDT5Y2023.B01001) ·
+  [B02001 race](https://data.census.gov/table/ACSDT5Y2023.B02001) ·
+  [B03003 Hispanic](https://data.census.gov/table/ACSDT5Y2023.B03003) ·
+  [B25044 vehicles](https://data.census.gov/table/ACSDT5Y2023.B25044) ·
+  [B11016 household size](https://data.census.gov/table/ACSDT5Y2023.B11016) ·
+  [B19001 income](https://data.census.gov/table/ACSDT5Y2023.B19001)
+
+**Public Use Microdata Sample (PUMS) — anonymized sample households**
+- Overview: https://www.census.gov/programs-surveys/acs/microdata.html
+- Documentation / data dictionary: https://www.census.gov/programs-surveys/acs/microdata/documentation.html
+- API endpoint: `https://api.census.gov/data/2023/acs/acs5/pums`
+  ([variables](https://api.census.gov/data/2023/acs/acs5/pums/variables.html))
+
+**Boundaries & roads**
+- TIGER/Line boundary shapefiles (selecting Altadena's neighborhoods): https://www.census.gov/cgi-bin/geo/shapefiles/index.php
+- OpenStreetMap drivable road network (via `osmnx`): https://www.openstreetmap.org
+
+**Access:** pulling ACS/PUMS from the API needs a free key — https://api.census.gov/data/key_signup.html
+
+---
+
 ## Why a custom mesoscopic traffic engine (not SUMO)
 
 SUMO 1.27 + TraCI is available in the dev environment and the prompt prefers it. We chose a
