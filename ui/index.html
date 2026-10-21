@@ -212,8 +212,8 @@
 
       <h3>What am I looking at?</h3>
       <p>It’s a simulation (basically a detailed “SimCity”-style model) of people
-        trying to drive out of <b>Altadena, California</b> during a wildfire. It’s a
-        research project with Dr. Sarah Grajdura at UIC. The big question:
+        trying to drive out of <b>Altadena, California</b> during a wildfire. The
+        big question:
         <b>if self-driving cars helped with the evacuation, how should they decide
         who to pick up — and would that actually help the people who don’t own a
         car?</b> Everybody in town is represented as a little dot that has to get to
@@ -304,7 +304,7 @@
         <b>get ready</b>, (if they need a ride) <b>request one</b>, then
         <b>leave</b> and <b>drive to safety</b> — each taking some time. The default
         timings (roughly 15 minutes to notice, 20 to pack up) are
-        <b>reasonable placeholders</b> that Dr. Grajdura can swap out. I also
+        <b>reasonable placeholders</b> that can easily be changed. I also
         separate owning a phone from the phone network actually working.</p>
 
       <h3>The four self-driving-car strategies I compare</h3>
@@ -600,7 +600,7 @@ $('#tour-blocker').onclick=endTour;
 $('#tour-btn').onclick=startTour;
 $('#tour-yes').onclick=startTour;
 $('#tour-no').onclick=()=>{ markTourSeen(); $('#tour-prompt').style.display='none'; };
-// ---------------- sources & methods modal ----------------
+// ---------------- sources & methods (opens in a big new tab) ----------------
 function updateAboutNote(){
   const m=replay&&replay.meta, el=$('#about-scenote');
   if(m){ const s=m.summary||{};
@@ -609,15 +609,49 @@ function updateAboutNote(){
       (s.carless_reached_frac!=null?', carless '+Math.round(s.carless_reached_frac*100)+'%':'');
   } else el.textContent='No scenario loaded yet.';
 }
-function openAbout(){ updateAboutNote(); $('#about').style.display='flex'; }
-function closeAbout(){ $('#about').style.display='none'; }
-const aboutOpen=()=>$('#about').style.display==='flex';
+const ABOUT_CSS=`
+  :root{--accent:#0a7f6b;--muted:#6b7684;--good:#1a8a4a;--edge:#d8dee6}
+  *{box-sizing:border-box}
+  body{margin:0;background:#f4f6f9;color:#1c2430;
+    font:16px/1.7 "Segoe UI",Inter,system-ui,-apple-system,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 28px 80px}
+  h1{font-size:30px;margin:0 0 4px;color:#0f1722;letter-spacing:.2px}
+  .sub{color:var(--muted);margin:0 0 24px;font-size:15px}
+  h3{font-size:20px;margin:34px 0 10px;color:#0f1722}
+  p,li{font-size:16px}
+  ul{padding-left:22px} li{margin:7px 0}
+  b{color:#0f1722}
+  .mut{color:var(--muted)}
+  code{background:#eef1f5;border:1px solid var(--edge);border-radius:4px;padding:1px 6px;font-size:14px}
+  .scenote{border:1px solid var(--edge);background:#eaf1ff;border-radius:10px;
+    padding:12px 16px;margin:0 0 20px;font-size:15px;color:#2b3a52}
+  .callout{border-left:5px solid #e0a500;background:#fff8e6;border-radius:8px;
+    padding:14px 18px;margin:16px 0;font-size:15.5px}
+  .callout.good{border-left-color:var(--good);background:#eaf7ee}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:15px}
+  td,th{border:1px solid var(--edge);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:#eef1f5;color:#394250;font-weight:600}
+  @media print{body{background:#fff}.wrap{max-width:100%}}
+`;
+function openAbout(){
+  updateAboutNote();
+  const body=$('#about .body').innerHTML;
+  const doc='<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+    +'<meta name="viewport" content="width=device-width,initial-scale=1">'
+    +'<title>Altadena Evacuation — Sources & Methods</title><style>'+ABOUT_CSS+'</style>'
+    +'</head><body><div class="wrap"><h1>Altadena Evacuation Model</h1>'
+    +'<p class="sub">Sources &amp; Methods — plain-language explanation</p>'
+    +body+'</div></body></html>';
+  const w=window.open('','_blank');
+  if(w){ w.document.open(); w.document.write(doc); w.document.close(); }
+  else { // popup blocked -> fall back to a blob link in a new tab
+    const url=URL.createObjectURL(new Blob([doc],{type:'text/html'}));
+    window.open(url,'_blank');
+  }
+}
 $('#about-btn').onclick=openAbout;
-$('#about-close').onclick=closeAbout;
-$('#about').onclick=e=>{ if(e.target===$('#about')) closeAbout(); };
 
-document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return;
-  if(aboutOpen()) closeAbout(); else if(tourActive()) endTour(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&tourActive()) endTour(); });
 addEventListener('resize',()=>{ if(tourActive()) layoutTour(); });
 
 loadIndex();
