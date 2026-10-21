@@ -85,8 +85,11 @@ python -m scripts.compare_policies --config config/experiments.yaml
 # tests
 python -m pytest -q
 
-# compile all results into one multi-sheet Excel workbook
+# compile all results into one multi-sheet Excel workbook (with charts)
 python -m scripts.export_excel        # -> outputs/altadena_results.xlsx
+
+# render result charts as PNGs (also shown in the UI Results panel)
+python -m scripts.make_charts         # -> outputs/ui/charts/*.png
 ```
 
 ### Live UI ("mission control")

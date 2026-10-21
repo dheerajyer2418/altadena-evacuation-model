@@ -39,11 +39,23 @@ def main():
         print(f"  could not inline deck.gl ({type(e).__name__}); keeping CDN link "
               f"(needs internet to load the map library)")
 
+    # embed chart PNGs as base64 data URIs (so they render offline)
+    import base64
+    charts = {}
+    chart_dir = ui_dir / "charts"
+    if chart_dir.exists():
+        for png in sorted(chart_dir.glob("*.png")):
+            b64 = base64.b64encode(png.read_bytes()).decode("ascii")
+            charts[png.name] = "data:image/png;base64," + b64
+        if charts:
+            print(f"  embedded {len(charts)} chart image(s)")
+
     # embed data as JSON strings parsed at runtime (fast + safe escaping)
     data_script = (
         "<script>\n"
         f"window.__INDEX__=JSON.parse({json.dumps(json.dumps(index))});\n"
         f"window.__REPLAYS__=JSON.parse({json.dumps(json.dumps(replays))});\n"
+        f"window.__CHARTS__=JSON.parse({json.dumps(json.dumps(charts))});\n"
         "</script>\n"
     )
     # inject right before the app script (the last <script> block)

@@ -143,6 +143,13 @@
   #results .good{color:var(--good);font-weight:700}
   #results .warn{color:var(--carless);font-weight:700}
   #results .cap{font-size:11px;color:var(--muted);margin:10px 2px 0;line-height:1.5}
+  #results .rc-h{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);
+    margin:20px 0 8px;border-bottom:1px solid var(--edge);padding-bottom:5px}
+  #results-charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  #results-charts figure{margin:0;background:#0d151f;border:1px solid var(--edge);border-radius:9px;padding:8px}
+  #results-charts img{width:100%;height:auto;display:block;border-radius:6px;background:#fff;cursor:zoom-in}
+  #results-charts figcaption{font-size:11px;color:var(--muted);margin-top:6px;text-align:center}
+  @media(max-width:720px){#results-charts{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -235,6 +242,8 @@
       <button id="results-close" title="Close">✕</button></header>
     <div class="body">
       <div id="results-table">loading…</div>
+      <h3 class="rc-h">Charts</h3>
+      <div id="results-charts"></div>
       <p class="cap">“Reached” = share of people present who got to safety · “Carless”
         = same for households with no car (the study’s focus) · “Exposed” = people the
         fire front reached (a danger signal, not a casualty count). These are
@@ -624,7 +633,7 @@ const TOUR=[
   {el:'#right', title:'7 · Live outcomes',
    text:'These counters update as it plays: people reaching safety, people exposed to the fire, and a dedicated carless-households panel — the focus of this research.'},
   {el:'#results-btn', title:'8 · Results', place:'bottom',
-   text:'See every scenario’s outcomes side by side in a table, and download them as a spreadsheet (CSV, opens in Excel) or JSON.'},
+   text:'See every scenario’s outcomes side by side — a comparison table plus charts (click any chart to enlarge) — and download the data as a spreadsheet (CSV) or JSON.'},
   {el:'#about-btn', title:'9 · Sources & methods', place:'bottom',
    text:'Everything behind the model — every data source, how each parameter was chosen, what was verified, and the honest caveats — is explained here.'},
   {el:'#tour-btn', title:'You’re all set!', place:'bottom',
@@ -763,7 +772,26 @@ function buildResultsTable(){
   }
   $('#results-table').innerHTML=h+'</tbody></table>';
 }
-function openResults(){ buildResultsTable(); $('#results').style.display='flex'; }
+const CHARTS=[
+  ["reached_vs_carless.png","Who reaches safety: overall vs. carless households"],
+  ["left_behind_exposed.png","Left behind & exposed (share of people)"],
+  ["completion_over_time.png","Evacuation completion over time"],
+  ["population_fit.png","Synthetic-population fit error by neighborhood"],
+];
+function buildResultsCharts(){
+  const box=$('#results-charts'); box.innerHTML='';
+  CHARTS.forEach(([file,cap])=>{
+    const src=(window.__CHARTS__&&window.__CHARTS__[file]) || ('../outputs/ui/charts/'+file+'?_='+Date.now());
+    const fig=document.createElement('figure');
+    const img=document.createElement('img');
+    img.src=src; img.alt=cap; img.loading='lazy';
+    img.onclick=()=>window.open(src,'_blank');     // click to view full size
+    img.onerror=()=>fig.remove();                   // hide if not generated
+    const fc=document.createElement('figcaption'); fc.textContent=cap;
+    fig.appendChild(img); fig.appendChild(fc); box.appendChild(fig);
+  });
+}
+function openResults(){ buildResultsTable(); buildResultsCharts(); $('#results').style.display='flex'; }
 function closeResults(){ $('#results').style.display='none'; }
 const resultsOpen=()=>$('#results').style.display==='flex';
 function download(name,text,type){
