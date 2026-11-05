@@ -227,6 +227,7 @@
       <span><i class="dot" style="background:#ff5277"></i>carless home</span>
       <span><i class="dot" style="background:#ff5a3c"></i>fire front</span>
       <span><i class="dot" style="background:#46e0c0"></i>safety exit</span>
+      <span><i class="dot" style="background:#b06bff"></i>AV depot (pull-out)</span>
       <span class="note" id="foot-note"></span>
     </div>
   </div>
@@ -341,6 +342,26 @@
         reaching a freeway exit toward the 210 / Pasadena — a modeling choice, not a
         real evacuation order.</p>
 
+      <h3>Running a smaller, faster version (without breaking the traffic)</h3>
+      <p>The full town is ~41,000 people, which is slow to simulate. To iterate
+        faster I can run a <b>scaled-down copy</b> — say a random <b>25% of
+        households</b>. But fewer cars on the same roads would show artificially
+        little traffic, so I shrink the <b>roads by the same proportion</b> at the
+        same time: each road’s throughput drops to 25% and its holding space to
+        about 35%, and the self-driving fleet shrinks to 25% too. Because
+        congestion depends on the <i>ratio</i> of cars to road space, holding that
+        ratio fixed keeps the jams, queues, and the share of people who escape
+        representative — it just runs about 4× faster.</p>
+      <p class="mut">Method: population sampling with proportional flow- and
+        storage-capacity scaling — the approach used by the <b>MATSim</b> transport
+        simulator (its flow- and storage-capacity factors; Horni, Nagel &amp;
+        Axhausen, <i>The Multi-Agent Transport Simulation MATSim</i>, 2016) and
+        studied in population-downscaling work (e.g. Llorca &amp; Moeckel, 2019).
+        Storage is shrunk more gently than throughput (here by an exponent of
+        ~0.75) because shrinking it linearly starves very short roads — a known
+        artifact. The headline numbers are <b>fractions</b> (share reaching
+        safety), which stay comparable to the full-scale run.</p>
+
       <h3>The fire</h3>
       <p>The fire starts in the foothills and spreads outward, pushed to the
         southwest like a wind-driven Santa-Ana fire. As it reaches a road, that road
@@ -370,7 +391,10 @@
         same basic rules so the only thing that changes is the strategy itself:</p>
       <ul>
         <li><b>Pull out</b> — stop picking people up once the fire gets close to the
-          service area.</li>
+          service area. The withdrawing cars then retreat to a single
+          <b>staging depot</b> set off to the side, away from the evacuation exits,
+          so the pulled-out fleet doesn’t clog the roads everyone else is using to
+          get out. (The depot’s location is an adjustable setting.)</li>
         <li><b>Normal</b> — first-come, first-served, no special priority.</li>
         <li><b>Help-the-vulnerable-first</b> — prioritize people with no car and
           those who need assistance.</li>
@@ -395,6 +419,31 @@
       <p class="mut">Every setting lives
         in plain text files anyone can change, and the full write-ups are in the
         project’s README and notes.</p>
+
+      <h3>What was built in this development session</h3>
+      <p>Recent additions to the model and this site:</p>
+      <ul>
+        <li><b>Pull-out depot.</b> The “pull out” strategy now retreats its cars to
+          a single staging <b>depot</b> off to the side, instead of scattering onto
+          the evacuation exits — so a pull-out doesn’t clog the roads everyone else
+          needs. It shows on the map as a purple marker.</li>
+        <li><b>Testing many different fires.</b> A tool that randomly varies
+          <b>where the fire starts and which way it spreads</b> and runs the model
+          many times, to check whether the “which strategy wins for people without
+          a car” answer holds up across different fires — using two fire sets:
+          realistic foothill fires, and an unbiased stress test.</li>
+        <li><b>Testing the traffic assumptions.</b> A tool that re-runs the whole
+          comparison across a range of road-capacity guesses, since the traffic
+          numbers aren’t calibrated — to see whether the conclusion is robust to
+          them.</li>
+        <li><b>Scaled-down fast model.</b> The 25%-sample option described above,
+          so experiments run ~4× faster while keeping the traffic realistic.</li>
+        <li><b>Watch a specific test fire.</b> Any one of the randomized fires can
+          be replayed as an animation here on the map.</li>
+      </ul>
+      <div class="callout">These are tools and modeling options. The honest-limits
+        notes above — hypothetical fire, uncalibrated traffic, and no comparison to
+        a real evacuation — still apply to every number shown.</div>
     </div>
   </div>
 </div>
@@ -545,6 +594,11 @@ function buildLayers(){
       getPosition:d=>[d[0],d[1]],getFillColor:[70,224,192,230],getLineColor:[255,255,255,220],
       stroked:true,getLineWidth:2,lineWidthUnits:'pixels',
       getRadius:80,radiusUnits:'meters',radiusMinPixels:7,radiusMaxPixels:16}));
+  if(replay.depot && replay.depot.lon!=null)
+    L.push(new deck.ScatterplotLayer({id:'depot',data:[replay.depot],
+      getPosition:d=>[d.lon,d.lat],getFillColor:[176,107,255,235],getLineColor:[255,255,255,235],
+      stroked:true,getLineWidth:3,lineWidthUnits:'pixels',
+      getRadius:140,radiusUnits:'meters',radiusMinPixels:10,radiusMaxPixels:22}));
   if(layersState.veh && fr)
     L.push(new deck.ScatterplotLayer({id:'veh',data:fr.pts,
       getPosition:d=>[d[0],d[1]],getFillColor:d=>KIND_COLOR[d[2]]||[200,200,200],
