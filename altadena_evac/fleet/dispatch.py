@@ -56,7 +56,8 @@ class AVDispatcher:
     def __init__(self, net, forecast, fleet_cfg: dict, policy: ResolvedPolicy,
                  persons: dict, n_vehicles: int, seats_per_av: int,
                  service_centroid: tuple[float, float],
-                 max_av_wait_s: float, start_vid: int = 1_000_000):
+                 max_av_wait_s: float, depot_node: int | None = None,
+                 start_vid: int = 1_000_000):
         self.net = net
         self.forecast = forecast
         self.policy = policy
@@ -69,6 +70,7 @@ class AVDispatcher:
         self.seats_per_av = seats_per_av
         self.service_centroid = service_centroid
         self.max_av_wait_s = max_av_wait_s
+        self.depot_node = depot_node     # pull-out staging node (off egress routes)
         self.nominal_front_speed = 1.4   # controller's ASSUMED front speed (m/s)
 
         # build fleet at staging nodes (destinations by default)
@@ -336,10 +338,20 @@ class AVDispatcher:
                 self._retreat(av, now)
 
     def _retreat(self, av: Vehicle, now: float) -> None:
+        """Pull a vehicle out of service. If the policy's retreat rule is 'depot'
+        and a depot node is configured, retreating AVs converge on that single
+        staging node (deliberately off the egress routes) instead of dispersing
+        across the safety destinations — so a pull-out does not add AV traffic to
+        the roads evacuees are using. Retreating AVs carry no passengers (onboard
+        trips complete at safety first), so no false 'reached safety' is counted."""
         av.state = "retreat"
         if av.vid in self.idle:
             self.idle.remove(av.vid)
-        ok = self.net.inject(av, av.node, targets=self.net.destinations)
+        if self.policy.retreat == "depot" and self.depot_node is not None:
+            targets = {self.depot_node}
+        else:
+            targets = self.net.destinations
+        ok = self.net.inject(av, av.node, targets=targets)
         if not ok:
             av.state = "trapped"
 
