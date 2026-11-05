@@ -16,9 +16,10 @@ fleet:
   # Pull-out staging node for the withdrawal strategy: retreating AVs converge
   # HERE (a single spot off the main egress corridor) instead of dispersing to
   # the evacuation exits, so a pull-out does not add AV traffic to the roads
-  # evacuees use. EDITABLE modeling choice — place it clear of the southbound
-  # arterials. Mapped to the nearest network node at runtime.
-  depot: {lat: 34.1500, lon: -118.1520}
+  # evacuees use. Placed on the WESTERN edge (west of the Fair Oaks/Lake/Lincoln
+  # southbound arterials), ~2.2 km clear of every safety exit so it no longer
+  # overlaps them. EDITABLE; mapped to the nearest network node at runtime.
+  depot: {lat: 34.1600, lon: -118.1780}
 
 # Common dispatch rules — identical across policies so comparisons isolate the
 # policy under study (requirement 7). Only the fields in each policy block differ.

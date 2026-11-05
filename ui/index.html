@@ -594,11 +594,23 @@ function buildLayers(){
       getPosition:d=>[d[0],d[1]],getFillColor:[70,224,192,230],getLineColor:[255,255,255,220],
       stroked:true,getLineWidth:2,lineWidthUnits:'pixels',
       getRadius:80,radiusUnits:'meters',radiusMinPixels:7,radiusMaxPixels:16}));
-  if(replay.depot && replay.depot.lon!=null)
-    L.push(new deck.ScatterplotLayer({id:'depot',data:[replay.depot],
-      getPosition:d=>[d.lon,d.lat],getFillColor:[176,107,255,235],getLineColor:[255,255,255,235],
+  if(replay.depot && replay.depot.lon!=null){
+    const dp=[replay.depot];
+    // translucent halo so it reads clearly against roads/other markers
+    L.push(new deck.ScatterplotLayer({id:'depot-halo',data:dp,
+      getPosition:d=>[d.lon,d.lat],getFillColor:[176,107,255,70],
+      getRadius:340,radiusUnits:'meters',radiusMinPixels:18,radiusMaxPixels:46}));
+    // bold core dot with a white outline
+    L.push(new deck.ScatterplotLayer({id:'depot',data:dp,
+      getPosition:d=>[d.lon,d.lat],getFillColor:[176,107,255,255],getLineColor:[255,255,255,255],
       stroked:true,getLineWidth:3,lineWidthUnits:'pixels',
-      getRadius:140,radiusUnits:'meters',radiusMinPixels:10,radiusMaxPixels:22}));
+      getRadius:150,radiusUnits:'meters',radiusMinPixels:13,radiusMaxPixels:26}));
+    // label
+    L.push(new deck.TextLayer({id:'depot-label',data:dp,
+      getPosition:d=>[d.lon,d.lat],getText:()=>'DEPOT',getSize:13,sizeUnits:'pixels',
+      getColor:[235,222,255,255],getPixelOffset:[0,-24],fontWeight:700,
+      getTextAnchor:'middle',getAlignmentBaseline:'center'}));
+  }
   if(layersState.veh && fr)
     L.push(new deck.ScatterplotLayer({id:'veh',data:fr.pts,
       getPosition:d=>[d[0],d[1]],getFillColor:d=>KIND_COLOR[d[2]]||[200,200,200],

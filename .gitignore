@@ -22,6 +22,10 @@ secrets.*
 output/
 tmp/
 
+# Private meeting/working notes — keep out of the public repo.
+MEETING_NOTES.md
+*[Mm]eeting*
+
 # osmnx HTTP cache
 cache/
 
