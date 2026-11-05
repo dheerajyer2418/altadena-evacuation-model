@@ -430,8 +430,9 @@
       <p><b>(a) The fire physics.</b> A fire is fully described by four numbers:</p>
       <ul>
         <li><b>ignition</b> (longitude/latitude) — where it starts;</li>
-        <li><b>spread axis</b> — the compass direction it is pushed (0° = north,
-          clockwise; 180° = due south, 225° = southwest);</li>
+        <li><b>spread axis</b> — the direction the wind pushes the fire (e.g. south,
+          or southwest). In our main scenario it's pushed <b>southwest</b>, like a
+          Santa-Ana wind;</li>
         <li><b>anisotropy</b> — how much faster it runs <i>downwind</i> along that
           axis than cross- or up-wind;</li>
         <li><b>base speed</b> — the front's baseline spread rate.</li>
@@ -443,6 +444,19 @@
         A road <b>closes</b> once the fire has passed more than half its length, and a
         person is counted as <b>exposed</b> when the front comes within 150 m
         (exposure is a danger signal, <b>not</b> an injury or death).</p>
+      <p class="mut"><b>How we knew what to do here (where the fire model comes
+        from).</b> This follows the standard way wildfire behavior is described: a
+        fire spreads outward from where it starts, and wind makes it run faster
+        downwind, so the burned area grows as an <b>ellipse stretched along the
+        wind</b> rather than an even circle. That elliptical, wind-driven picture is
+        a long-established assumption in fire science (Van Wagner, 1969; fire
+        rate-of-spread from Rothermel, 1972) and is what operational simulators like
+        <b>FARSITE</b> use (via Huygens' principle). Our version deliberately keeps
+        just that essential behavior in a <b>simple, adjustable</b> front — it is
+        <b>not</b> calibrated to real vegetation, terrain, or a measured wind field,
+        which is exactly why we <i>randomize</i> it and report relative comparisons.
+        A physically-based version (real fuels + slope + wind) is laid out in the
+        project's plan for when higher fidelity is needed. See the References below.</p>
       <p><b>(b) The sampler.</b> Draws many random fires from a <b>seeded</b> random
         generator (the same seed always reproduces the same fires), in two sets:</p>
       <ul>
@@ -507,6 +521,13 @@
         <li><i>Effects of scaling down the population for agent-based traffic
           simulations</i> (2019) —
           <a href="https://www.sciencedirect.com/science/article/pii/S1877050919305691/pdf" target="_blank" rel="noopener">link</a>.</li>
+        <li>Fire model (elliptical, wind-driven front) — the standard assumption that
+          fires grow as a downwind ellipse: Van Wagner (1969); fire rate-of-spread:
+          Rothermel (1972); operationalized via Huygens' principle in FARSITE
+          (Finney, 1998).</li>
+        <li>Sullivan (2009), <i>Wildland fire-spread modelling, 1990–present: 3.
+          Mathematical analogues and simulation models</i> —
+          <a href="https://arxiv.org/pdf/0706.4130" target="_blank" rel="noopener">review</a>.</li>
       </ul>
     </div>
   </div>
