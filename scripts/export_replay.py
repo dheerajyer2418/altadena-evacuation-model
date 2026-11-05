@@ -47,6 +47,10 @@ def main():
     ap.add_argument("--fire-id", type=int, default=0, help="realization index within the set")
     ap.add_argument("--sample-seed", type=int, default=7,
                     help="must match scripts.sweep_hazard --sample-seed")
+    ap.add_argument("--sample-fraction", type=float, default=1.0, dest="sample_fraction",
+                    help="run a scaled-down model: keep this fraction of households "
+                         "with flow/storage capacity and AV fleet scaled to match "
+                         "(e.g. 0.25). Preserves congestion at smaller scale.")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -81,9 +85,13 @@ def main():
                         else cfg["hazard"]["scenarios"][args.hazard])
 
     pol = args.policy if args.fleet > 0 else "none(no_av)"
-    label = args.label or (f"{fire_tag + ' / ' if fire_tag else ''}"
+    samp = args.sample_fraction
+    samp_tag = "" if samp >= 1.0 else f"ds{round(samp*100)}"
+    samp_lbl = "" if samp >= 1.0 else f"{round(samp*100)}% sample / "
+    label = args.label or (f"{samp_lbl}{fire_tag + ' / ' if fire_tag else ''}"
                            f"{pol} / fleet {args.fleet} ({args.mode})")
-    print(f"running '{label}': {base_pop.n_households} hh / {base_pop.n_persons} persons")
+    print(f"running '{label}': {base_pop.n_households} hh / {base_pop.n_persons} persons"
+          + (f"  (sampling to {samp:.0%})" if samp < 1.0 else ""))
 
     seeds = {"behavior": cfg["sim"]["seeds"]["behavior"][0],
              "dispatch": cfg["sim"]["seeds"]["dispatch"][0],
@@ -91,7 +99,8 @@ def main():
     result, sim = runner.run_single(
         G, dests, base_pop, cfg, scenario_cfg,
         args.policy if args.fleet > 0 else "normal", args.fleet, seeds,
-        record_every_s=args.record_every, max_render=args.max_render, return_sim=True)
+        record_every_s=args.record_every, max_render=args.max_render, return_sim=True,
+        sample_fraction=args.sample_fraction)
 
     row = metrics.summarize(result)
     replay_meta = {
@@ -104,11 +113,27 @@ def main():
                  else "real ACS/PUMS") + " population; hypothetical hazard; "
                  "uncalibrated traffic — relative comparison only.",
     }
-    replay = build_replay(sim.net, base_pop, scenario_cfg, sim.frames, replay_meta)
+    # Include the depot location only when this policy actually retreats there,
+    # so the map marker appears exactly when it's meaningful (the pull-out run).
+    depot_payload = None
+    if args.fleet > 0:
+        from altadena_evac.fleet.policies import resolve_policy
+        from altadena_evac.network.build import nearest_node
+        rp = resolve_policy(args.policy, cfg["fleet"])
+        dcfg = cfg["fleet"]["fleet"].get("depot")
+        if rp.retreat == "depot" and dcfg:
+            dn = nearest_node(G, dcfg["lon"], dcfg["lat"])
+            if dn is not None:
+                nd = sim.net.G.nodes[dn]
+                depot_payload = {"lon": nd.get("lon"), "lat": nd.get("lat")}
+
+    replay = build_replay(sim.net, base_pop, scenario_cfg, sim.frames, replay_meta,
+                          depot=depot_payload)
 
     out_dir = project_path("outputs", "ui")
     out_dir.mkdir(parents=True, exist_ok=True)
-    rid_src = f"{args.mode}_{fire_tag + '_' if fire_tag else ''}{pol}_{args.fleet}"
+    rid_src = (f"{args.mode}_{samp_tag + '_' if samp_tag else ''}"
+               f"{fire_tag + '_' if fire_tag else ''}{pol}_{args.fleet}")
     rid = re.sub(r"[^a-z0-9]+", "_", rid_src.lower()).strip("_")
     path = out_dir / f"replay_{rid}.json"
     with open(path, "w", encoding="utf-8") as fh:

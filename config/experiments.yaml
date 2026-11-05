@@ -43,6 +43,20 @@ scenarios:
       - {name: screen_and_retreat, retreat_changes: true}
     description: "Separate screening effect from retreat-behavior change."
 
+  # Scaled-down real-population model (MATSim-style sample scaling). Runs a 25%
+  # random sample of households with link flow capacity x0.25, link storage
+  # x0.25^0.75 (~0.35; storage scaled gentler than flow for small samples), and
+  # the AV fleet x0.25 — so the demand-to-supply ratio, and thus congestion, is
+  # preserved at ~4x lower cost. Outcome FRACTIONS stay comparable to full scale.
+  # Use: scripts.export_replay ... --sample-fraction 0.25   (needs CENSUS_API_KEY
+  # for the real population; else labeled synthetic).
+  downsampled_real:
+    hazard: foothill_santa_ana
+    sample_fraction: 0.25
+    policies: [normal, evac_priority, adaptive_geofencing, withdrawal]
+    fleet_sizes: [0, 300]
+    description: "25% real-population sample; capacity/storage/fleet scaled to match."
+
 # Reporting horizon metrics (requirement 9)
 reporting:
   breakdown_by: [neighborhood, vehicle_access, assistance_need]

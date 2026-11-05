@@ -102,6 +102,34 @@ def prepare(cfg, mode: str, seed: int):
     return G, dests, base_pop
 
 
+# --------------------------------------------------------- population sampling
+# Storage scales more gently than flow for small samples (MATSim guidance: naive
+# linear storage scaling starves short/low-capacity links). storage_factor =
+# sample_fraction ** STORAGE_EXP, with STORAGE_EXP ~0.75 (empirically recommended).
+STORAGE_EXP = 0.75
+
+
+def downsample_population(pop, fraction: float, seed: int):
+    """Keep a random `fraction` of WHOLE households (with their members).
+
+    Paired with proportional scaling of link flow capacity, link storage, and the
+    AV fleet (see run_single) so the demand-to-supply ratio — and therefore the
+    congestion regime — is preserved at the smaller scale. Household structure is
+    kept intact so vehicle/seat/carless logic is unchanged."""
+    from ..population.agents import Population
+    rng = np.random.default_rng(seed)
+    hhs = pop.households
+    k = max(1, round(len(hhs) * fraction))
+    keep_idx = sorted(rng.choice(len(hhs), size=k, replace=False).tolist())
+    keep_h = [hhs[i] for i in keep_idx]
+    keep_hids = {h.hid for h in keep_h}
+    keep_p = [p for p in pop.persons if p.hid in keep_hids]
+    new = Population(persons=keep_p, households=keep_h, meta=dict(pop.meta))
+    new.meta["sample_fraction"] = fraction
+    new.meta["sampled_from_n_households"] = len(hhs)
+    return new
+
+
 # --------------------------------------------------------------- run one
 def _reset_state(pop):
     for p in pop.persons:
@@ -116,14 +144,29 @@ def _reset_state(pop):
 
 def run_single(G, destinations, base_pop, cfg, scenario_cfg, policy_name,
                fleet_size, seeds: dict, record_every_s=None, max_render=4000,
-               return_sim=False) -> dict:
+               return_sim=False, sample_fraction=1.0) -> dict:
     """Run one evacuation. seeds: {behavior, dispatch, hazard} ints.
 
     If record_every_s is set, the Simulation records replay frames; pass
-    return_sim=True to get (result, sim) so callers can read sim.frames."""
+    return_sim=True to get (result, sim) so callers can read sim.frames.
+
+    sample_fraction < 1.0 runs a scaled-down model: a random fraction of
+    households, with link flow capacity, link storage, and the AV fleet scaled
+    proportionally so congestion stays representative (MATSim-style sample
+    scaling). Outcome fractions remain comparable to the full-scale run."""
     pop = copy.deepcopy(base_pop)
     _reset_state(pop)
+    scaled_fleet = fleet_size
+    if sample_fraction < 1.0:
+        pop = downsample_population(pop, sample_fraction, seed=seeds["behavior"])
+        scaled_fleet = max(0, round(fleet_size * sample_fraction))
     net = MesoNetwork(G, destinations)
+    if sample_fraction < 1.0:
+        sto_f = sample_fraction ** STORAGE_EXP
+        for link in net.links.values():
+            link.capacity_veh_s *= sample_fraction
+            link.storage_veh = max(1.0, link.storage_veh * sto_f)
+    fleet_size = scaled_fleet
 
     # hazard ground truth + forecast (controller sees forecast only)
     gt = GroundTruthHazard(scenario_cfg)
@@ -165,6 +208,7 @@ def run_single(G, destinations, base_pop, cfg, scenario_cfg, policy_name,
         "seeds": dict(seeds),
         "behavior_summary": behav_summary,
         "population_source": base_pop.meta.get("SOURCE", "unknown"),
+        "sample_fraction": sample_fraction,
     }
     if return_sim:
         return result, sim

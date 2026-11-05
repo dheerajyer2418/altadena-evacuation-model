@@ -48,7 +48,7 @@ WHAT WAS DONE THIS SESSION
    too coarse for road-level closure and a minutes-scale evacuation. Kept only as
    a reference; real sources would be LANDFIRE / 3DEP / HRRR / gridMET / FIRMS.
 
-6. Design doc  (NEW: docs/HAZARD_RANDOMIZATION_PLAN.md)
+6. Design doc  (NEW: HAZARD_RANDOMIZATION_PLAN.md, repo root)
    Level 1 (randomized synthetic fire) — BUILT. Level 2 (real wind/terrain/fuel,
    elliptical Rothermel-style or external ELMFIRE/Cell2Fire) — DESIGNED, unbuilt.
 

@@ -15,7 +15,8 @@ def _nodes_bounds(net):
             "clon": sum(lons) / len(lons), "clat": sum(lats) / len(lats)}
 
 
-def build_replay(net, pop, scenario_cfg, frames, meta: dict) -> dict:
+def build_replay(net, pop, scenario_cfg, frames, meta: dict,
+                 depot: dict | None = None) -> dict:
     # roads (undirected, deduped) as coordinate pairs
     roads, seen = [], set()
     for (u, v) in net.links:
@@ -49,6 +50,7 @@ def build_replay(net, pop, scenario_cfg, frames, meta: dict) -> dict:
         "roads": roads,
         "origins": origins,
         "destinations": dests,
+        "depot": depot,          # pull-out staging node (lon/lat) or None
         "hazard": hz,
         "frames": frames,
     }
