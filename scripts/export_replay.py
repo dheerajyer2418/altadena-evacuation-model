@@ -39,16 +39,50 @@ def main():
     ap.add_argument("--record-every", type=float, default=30.0, dest="record_every")
     ap.add_argument("--max-render", type=int, default=4000, dest="max_render")
     ap.add_argument("--seed", type=int, default=None)
+    # Reproduce a specific randomized fire from scripts.sweep_hazard so the UI
+    # can animate the exact same scenario. Uses the same hazard.sampler with the
+    # same default sample-seed, so --fire-set/--fire-id match the sweep's fires.
+    ap.add_argument("--fire-set", choices=["foothills", "unbiased"], default=None,
+                    help="animate a sampled fire instead of the config hazard")
+    ap.add_argument("--fire-id", type=int, default=0, help="realization index within the set")
+    ap.add_argument("--sample-seed", type=int, default=7,
+                    help="must match scripts.sweep_hazard --sample-seed")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
     seed = args.seed if args.seed is not None else cfg["sim"]["seeds"]["population"]
-    scenario_cfg = (_toy_scenario(cfg) if args.mode == "toy"
-                    else cfg["hazard"]["scenarios"][args.hazard])
 
     G, dests, base_pop = runner.prepare(cfg, args.mode, seed)
+
+    # Resolve the hazard scenario: either a sampled sweep fire or the config hazard.
+    fire_tag = ""
+    if args.fire_set:
+        from altadena_evac.hazard import sampler
+        if args.mode == "altadena" and cfg.get("study", {}).get("boundary", {}).get("demand_bbox"):
+            b = cfg["study"]["boundary"]["demand_bbox"]
+            bbox = (b["west"], b["south"], b["east"], b["north"])
+        else:
+            bbox = sampler.bbox_from_graph(G)
+        # Per-set seed offset mirrors sweep_hazard's enumerate over the default
+        # --sets order (foothills, unbiased) so the fire matches exactly.
+        set_offset = {"foothills": 0, "unbiased": 1}
+        reals = sampler.sample_realizations(
+            args.fire_set, args.fire_id + 1, bbox,
+            seed=args.sample_seed + set_offset[args.fire_set])
+        real = reals[args.fire_id]
+        scenario_cfg = sampler.apply_realization(
+            cfg["hazard"]["scenarios"][args.hazard], real)
+        fire_tag = f"{args.fire_set}{args.fire_id}"
+        print(f"fire {fire_tag}: ign=({real['ignition_lat']:.4f},{real['ignition_lon']:.4f}) "
+              f"axis={real['direction_bias_deg']:.1f} aniso={real['anisotropy']:.2f} "
+              f"v={real['speed_mps']:.2f}")
+    else:
+        scenario_cfg = (_toy_scenario(cfg) if args.mode == "toy"
+                        else cfg["hazard"]["scenarios"][args.hazard])
+
     pol = args.policy if args.fleet > 0 else "none(no_av)"
-    label = args.label or f"{pol} / fleet {args.fleet} ({args.mode})"
+    label = args.label or (f"{fire_tag + ' / ' if fire_tag else ''}"
+                           f"{pol} / fleet {args.fleet} ({args.mode})")
     print(f"running '{label}': {base_pop.n_households} hh / {base_pop.n_persons} persons")
 
     seeds = {"behavior": cfg["sim"]["seeds"]["behavior"][0],
@@ -74,7 +108,8 @@ def main():
 
     out_dir = project_path("outputs", "ui")
     out_dir.mkdir(parents=True, exist_ok=True)
-    rid = re.sub(r"[^a-z0-9]+", "_", f"{args.mode}_{pol}_{args.fleet}".lower()).strip("_")
+    rid_src = f"{args.mode}_{fire_tag + '_' if fire_tag else ''}{pol}_{args.fleet}"
+    rid = re.sub(r"[^a-z0-9]+", "_", rid_src.lower()).strip("_")
     path = out_dir / f"replay_{rid}.json"
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(replay, fh, separators=(",", ":"), default=float)

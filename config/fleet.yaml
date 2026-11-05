@@ -13,6 +13,11 @@ fleet:
   seats_per_av: 4
   av_speed_factor: 1.0          # AVs obey same link speeds as private vehicles
   initial_staging: destinations # where idle AVs start: destinations | depot | random
+  # Pull-out staging node for the withdrawal strategy: retreating AVs converge
+  # HERE (a single spot off the main egress corridor) instead of dispersing to
+  # the evacuation exits, so a pull-out does not add AV traffic to the roads
+  # evacuees use. EDITABLE modeling choice — place it clear of the southbound
+  # arterials. Mapped to the nearest network node at runtime.
   depot: {lat: 34.1500, lon: -118.1520}
 
 # Common dispatch rules — identical across policies so comparisons isolate the
@@ -34,7 +39,9 @@ policies:
       value: 1200               # trigger when forecast front within 1.2 km of service area centroid
     onboard_passengers: complete_dropoff_at_safety
     assigned_but_not_boarded: cancel_and_reoffer   # released back to pending (may go unserved)
-    retreat: nearest_destination
+    retreat: depot                 # pull out to the staging depot (fleet.depot),
+                                   # off the egress routes; set 'nearest_destination'
+                                   # to instead disperse to the evacuation exits
 
   normal:                       # B
     description: "First-come, first-served. No vulnerability priority."

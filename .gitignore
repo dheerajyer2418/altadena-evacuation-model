@@ -13,6 +13,15 @@ inrix/
 *census_api_key*
 secrets.*
 
+# Survey microdata (human subjects) MUST stay out of version control.
+*.docx
+*.xlsx
+*[Ss]urvey*
+
+# stray local output dirs (note: canonical results dir is outputs/, plural)
+output/
+tmp/
+
 # osmnx HTTP cache
 cache/
 

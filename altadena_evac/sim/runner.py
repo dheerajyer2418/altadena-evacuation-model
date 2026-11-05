@@ -146,10 +146,15 @@ def run_single(G, destinations, base_pop, cfg, scenario_cfg, policy_name,
         if scenario_cfg.get("_retreat_changes_override") is not None:
             policy.retreat_changes = scenario_cfg["_retreat_changes_override"]
         max_wait = cfg["behavior"]["mode_choice"]["max_av_wait_before_selfhelp_s"]
+        # depot staging node for the pull-out (withdrawal) strategy, if configured
+        depot_node = None
+        depot_cfg = cfg["fleet"]["fleet"].get("depot")
+        if depot_cfg:
+            depot_node = nearest_node(G, depot_cfg["lon"], depot_cfg["lat"])
         dispatcher = AVDispatcher(
             net, forecast, cfg["fleet"], policy, persons,
             n_vehicles=fleet_size, seats_per_av=cfg["fleet"]["fleet"]["seats_per_av"],
-            service_centroid=centroid, max_av_wait_s=max_wait)
+            service_centroid=centroid, max_av_wait_s=max_wait, depot_node=depot_node)
 
     sim = Simulation_factory(pop, net, gt, dispatcher, cfg, scenario_cfg,
                              record_every_s=record_every_s, max_render=max_render)
