@@ -420,30 +420,94 @@
         in plain text files anyone can change, and the full write-ups are in the
         project’s README and notes.</p>
 
-      <h3>What was built in this development session</h3>
-      <p>Recent additions to the model and this site:</p>
+      <h3>What was built in this development session <span class="mut">(2026-11-05)</span></h3>
+      <p>Recent additions to the model and this site, in detail:</p>
+
+      <p><b>1 · Fire randomization</b> — the headline new capability. The fire used to
+        be a single fixed scenario, but different fires hit the road network very
+        differently, so a conclusion from one fire might not generalize. It works in
+        three layers:</p>
+      <p><b>(a) The fire physics.</b> A fire is fully described by four numbers:</p>
       <ul>
-        <li><b>Pull-out depot.</b> The “pull out” strategy now retreats its cars to
-          a single staging <b>depot</b> off to the side, instead of scattering onto
-          the evacuation exits — so a pull-out doesn’t clog the roads everyone else
-          needs. It shows on the map as a purple marker.</li>
-        <li><b>Testing many different fires.</b> A tool that randomly varies
-          <b>where the fire starts and which way it spreads</b> and runs the model
-          many times, to check whether the “which strategy wins for people without
-          a car” answer holds up across different fires — using two fire sets:
-          realistic foothill fires, and an unbiased stress test.</li>
-        <li><b>Testing the traffic assumptions.</b> A tool that re-runs the whole
-          comparison across a range of road-capacity guesses, since the traffic
-          numbers aren’t calibrated — to see whether the conclusion is robust to
-          them.</li>
-        <li><b>Scaled-down fast model.</b> The 25%-sample option described above,
-          so experiments run ~4× faster while keeping the traffic realistic.</li>
-        <li><b>Watch a specific test fire.</b> Any one of the randomized fires can
-          be replayed as an animation here on the map.</li>
+        <li><b>ignition</b> (longitude/latitude) — where it starts;</li>
+        <li><b>spread axis</b> — the compass direction it is pushed (0° = north,
+          clockwise; 180° = due south, 225° = southwest);</li>
+        <li><b>anisotropy</b> — how much faster it runs <i>downwind</i> along that
+          axis than cross- or up-wind;</li>
+        <li><b>base speed</b> — the front's baseline spread rate.</li>
       </ul>
+      <p>The time the fire reaches any point = distance from the ignition ÷ a
+        <i>direction-dependent</i> speed. That speed is highest when the direction to
+        the point lines up with the spread axis and is scaled by the anisotropy — so
+        the burned area grows as an <b>ellipse stretched downwind</b>, not a circle.
+        A road <b>closes</b> once the fire has passed more than half its length, and a
+        person is counted as <b>exposed</b> when the front comes within 150 m
+        (exposure is a danger signal, <b>not</b> an injury or death).</p>
+      <p><b>(b) The sampler.</b> Draws many random fires from a <b>seeded</b> random
+        generator (the same seed always reproduces the same fires), in two sets:</p>
+      <ul>
+        <li><b>foothills</b> (realistic): ignition in the northern ~30% of the area,
+          spread axis 180–250° (south → southwest, matching Santa-Ana downslope
+          winds) — "fire starts above town and is pushed down into it";</li>
+        <li><b>unbiased</b> (stress test): ignition anywhere, axis 0–360° — any
+          geometry, including unlikely ones.</li>
+      </ul>
+      <p>Both sets also vary anisotropy (1.2–2.5) and base speed (0.3–1.0 m/s; capped
+        so the fire is dire but still survivable — a fire that traps everyone leaves
+        nothing to compare). Each draw overrides <i>only</i> the fire; the forecast
+        error, exposure radius, and road-closure rules stay identical, so only the
+        fire geometry changes between runs.</p>
+      <p><b>(c) The run-many-fires tool.</b> For each set it samples N fires and runs
+        every policy on each fire — all on the <b>same population, network, and random
+        seeds</b> — so the only thing differing is the fire itself. It then reports,
+        per fire, which policy helped carless households most, and a verdict:
+        <b>STABLE</b> (one policy wins every fire), <b>MIXED</b>, or <b>ALL-TIED</b>,
+        plus data tables, box plots, and an "ignition map" (where fires start, colored
+        by how bad the outcome was). Any specific fire can be pulled up and
+        <b>animated</b> here on the map.</p>
+      <p class="mut">Caveat: the model's three "hazard" random seeds only perturb the
+        <i>forecast</i> error; the ground-truth fire is what this sampler makes random.</p>
+
+      <p><b>2 · Scaled-down fast model.</b> Keep a random fraction <code>f</code> of
+        households (e.g. 25%) and shrink the roads and fleet by the same fraction —
+        each road's throughput ×f, its holding space ×f<sup>0.75</sup> (shrunk more
+        gently so very short roads don't choke), and the AV fleet ×f. Because
+        congestion depends on the <i>ratio</i> of cars to road space, holding that
+        ratio fixed keeps the jams and the escape fractions representative, at about
+        4× lower cost. This is the standard <b>MATSim</b> sample-scaling method.
+        (Limit: below ~20% the current engine starves single-lane roads.)</p>
+
+      <p><b>3 · Pull-out depot.</b> When the "pull out" strategy triggers, withdrawing
+        AVs retreat to a single staging <b>depot</b> on the western edge (~2.2 km
+        clear of every exit, off the main southbound corridors) instead of scattering
+        onto the evacuation exits — so a pull-out doesn't add AV traffic to the roads
+        evacuees are using. Shown on the map as a purple halo with a "DEPOT" label.</p>
+
+      <p><b>4 · Traffic-assumption sweep.</b> Re-runs the whole policy comparison
+        across a range of road-capacity guesses — since the traffic numbers aren't
+        calibrated — to check whether the "which policy wins" answer is robust to
+        them, or an artifact of the guess.</p>
+
+      <p><b>5 · Live site.</b> New scenario buttons, regenerated comparison charts,
+        and this write-up.</p>
+
       <div class="callout">These are tools and modeling options. The honest-limits
         notes above — hypothetical fire, uncalibrated traffic, and no comparison to
         a real evacuation — still apply to every number shown.</div>
+
+      <h3>References (methods)</h3>
+      <ul>
+        <li>Population downsampling with proportional flow/storage capacity scaling —
+          MATSim's flow- and storage-capacity factors: Horni, Nagel &amp; Axhausen,
+          <i>The Multi-Agent Transport Simulation MATSim</i> (2016) —
+          <a href="https://d-nb.info/1172808686/34" target="_blank" rel="noopener">configuration chapter</a>.</li>
+        <li>Llorca &amp; Moeckel (2019), <i>Population Downscaling in Multi-Agent
+          Transportation Simulations: A Review and Case Study</i> —
+          <a href="https://www.researchgate.net/publication/346924881_Population_Downscaling_in_Multi-Agent_Transportation_Simulations_A_Review_and_Case_Study" target="_blank" rel="noopener">link</a>.</li>
+        <li><i>Effects of scaling down the population for agent-based traffic
+          simulations</i> (2019) —
+          <a href="https://www.sciencedirect.com/science/article/pii/S1877050919305691/pdf" target="_blank" rel="noopener">link</a>.</li>
+      </ul>
     </div>
   </div>
 </div>
